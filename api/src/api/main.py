@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 
 from api.db import engine
@@ -16,6 +17,7 @@ from api.routes.settings import router as settings_router
 from api.routes.tasks import router as tasks_router
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
 
 def _configure_logging() -> None:
@@ -48,6 +50,14 @@ app = FastAPI(
     version="0.1.0",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
