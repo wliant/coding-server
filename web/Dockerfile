@@ -1,3 +1,10 @@
+# Stage 0: Development (used by compose.dev.yaml)
+FROM node:20-alpine AS dev
+WORKDIR /app
+COPY web/package.json ./
+RUN npm install
+EXPOSE 3000
+
 # Stage 1: Install dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app

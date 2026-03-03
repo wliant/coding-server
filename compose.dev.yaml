@@ -52,6 +52,10 @@ services:
       - .env
 
   web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: dev
     command:
       - npm
       - run
@@ -61,9 +65,14 @@ services:
     volumes:
       - ./web/src:/app/src
       - ./web/public:/app/public
+      - ./web/next.config.ts:/app/next.config.ts:ro
+      - ./web/tsconfig.json:/app/tsconfig.json:ro
+      - ./web/tailwind.config.ts:/app/tailwind.config.ts:ro
+      - ./web/postcss.config.mjs:/app/postcss.config.mjs:ro
       - /app/node_modules
       - /app/.next
     environment:
+      NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     env_file:
