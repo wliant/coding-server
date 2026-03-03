@@ -14,7 +14,7 @@ Auto-generated from all feature plans. Last updated: 2026-03-02
 coding-machine/
 ├── compose.yaml / compose.dev.yaml / compose.e2e.yaml / compose.prod.yaml
 ├── openapi.json          # committed OpenAPI spec (source of truth for client gen)
-├── Makefile
+├── Taskfile.yml          # cross-platform task runner (replaces Makefile)
 ├── web/                  # Next.js 15 web interface
 │   ├── src/
 │   └── tests/
@@ -34,10 +34,10 @@ coding-machine/
 
 ```bash
 # Start local dev environment
-make dev
+task dev
 
 # Run all component tests
-make test-all
+task test-all
 
 # Run per-component tests (inside container)
 docker compose -f compose.yaml -f compose.dev.yaml exec api pytest tests/
@@ -45,10 +45,10 @@ docker compose -f compose.yaml -f compose.dev.yaml exec worker pytest tests/
 docker compose -f compose.yaml -f compose.dev.yaml exec tools pytest tests/
 
 # Run e2e tests
-make e2e
+task e2e
 
 # Regenerate OpenAPI spec + TypeScript client
-make generate
+task generate
 
 # Lint Python (ruff)
 cd api && ruff check src/
