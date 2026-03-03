@@ -1,0 +1,70 @@
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    env_file:
+      - .env
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    env_file:
+      - .env
+
+  tools:
+    ports:
+      - "${TOOLS_PORT:-8002}:8002"
+    volumes:
+      - ./tools/src:/app/src
+      - ./tools/tests:/app/tests
+    env_file:
+      - .env
+
+  api:
+    command:
+      - uvicorn
+      - api.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/src
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./api/src:/app/src
+      - ./api/tests:/app/tests
+    env_file:
+      - .env
+
+  worker:
+    ports:
+      - "${WORKER_PORT:-8001}:8001"
+    volumes:
+      - ./worker/src:/app/src
+      - ./worker/tests:/app/tests
+      - ./agent-work:/agent-work
+    env_file:
+      - .env
+
+  web:
+    command:
+      - npm
+      - run
+      - dev
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+      - /app/node_modules
+      - /app/.next
+    environment:
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    env_file:
+      - .env

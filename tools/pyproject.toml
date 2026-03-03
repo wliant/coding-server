@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tools"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: pure unit tests, no I/O",
+    "integration: uses FastMCP in-process client",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100

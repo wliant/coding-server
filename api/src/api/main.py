@@ -1,0 +1,74 @@
+import logging
+import logging.config
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+
+import redis.asyncio as aioredis
+from fastapi import FastAPI, Request, Response
+from pythonjsonlogger import jsonlogger
+
+from api.db import engine
+from api.routes.health import router as health_router
+from api.routes.jobs import router as jobs_router
+from api.routes.projects import router as projects_router
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+
+def _configure_logging() -> None:
+    handler = logging.StreamHandler()
+    formatter = jsonlogger.JsonFormatter(
+        fmt="%(asctime)s %(name)s %(levelname)s %(message)s"
+    )
+    handler.setFormatter(formatter)
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
+
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _configure_logging()
+    app.state.redis = aioredis.Redis.from_url(REDIS_URL, decode_responses=True)
+    logger.info("API startup complete", extra={"event": "startup"})
+    yield
+    await app.state.redis.aclose()
+    await engine.dispose()
+    logger.info("API shutdown complete", extra={"event": "shutdown"})
+
+
+app = FastAPI(
+    title="Multi-Agent Software Development System API",
+    version="0.1.0",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next) -> Response:
+    request_id = str(uuid.uuid4())
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "request",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": duration_ms,
+        },
+    )
+    return response
+
+
+app.include_router(health_router)
+app.include_router(projects_router)
+app.include_router(jobs_router)
