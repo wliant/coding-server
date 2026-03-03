@@ -1,0 +1,119 @@
+version: '3'
+
+dotenv: ['.env']
+
+tasks:
+
+  dev:
+    desc: Start local development environment with hot-reload
+    summary: |
+      Starts all services (api, worker, tools, web, postgres, redis) using the dev
+      compose overlay with hot-reload enabled. Requires Docker Desktop.
+      Press Ctrl+C to stop. Use 'task dev-down' to stop and remove containers.
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up
+
+  dev-down:
+    desc: Stop local development environment
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml down
+
+  e2e:
+    desc: Run end-to-end tests in isolated environment (separate ports)
+    summary: |
+      Starts an isolated environment on separate ports, runs the test-runner
+      container, then always tears down (including volumes) regardless of
+      test outcome. Exit code matches the test-runner exit code.
+      Requires: Docker Desktop. Uses .env.e2e for environment config.
+    dotenv: ['.env.e2e']
+    cmds:
+      - defer: docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v
+      - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up -d --wait
+      - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e run --rm --no-deps test-runner
+
+  prod:
+    desc: Start production environment
+    cmds:
+      - docker compose -f compose.yaml -f compose.prod.yaml up -d
+
+  prod-down:
+    desc: Stop production environment (WARNING - do NOT add -v, it destroys volumes)
+    cmds:
+      - docker compose -f compose.yaml -f compose.prod.yaml down
+
+  generate:
+    desc: Export OpenAPI spec and regenerate TypeScript client
+    summary: |
+      Exports the FastAPI OpenAPI spec to openapi.json at the repo root, then
+      regenerates the TypeScript client in web/src/client/ via @hey-api/client-fetch.
+      Requires: Python 3 (with api dependencies installed) and Node.js / npm.
+      Run from repo root. After running, commit both openapi.json and web/src/client/.
+    cmds:
+      - PYTHONPATH=api/src python3 api/scripts/export_openapi.py
+      - cd web && npm run generate
+
+  test-api:
+    desc: Run api pytest suite (requires dev environment running)
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml exec api python -m pytest tests/ -p no:cacheprovider
+
+  test-worker:
+    desc: Run worker pytest suite (requires dev environment running)
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml exec worker python -m pytest tests/ -p no:cacheprovider
+
+  test-tools:
+    desc: Run tools pytest suite (requires dev environment running)
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml exec tools python -m pytest tests/ -p no:cacheprovider
+
+  test-web:
+    desc: Run web jest suite
+    cmds:
+      - cd web && npx jest
+
+  test-all:
+    desc: Run all pytest suites and web jest suite
+    summary: |
+      Runs test-api, test-worker, test-tools, and test-web concurrently.
+      Requires the dev environment to be running ('task dev') for the container tests.
+      test-web runs on the host and requires Node.js.
+      Exit code is non-zero if any suite fails.
+    deps: [test-api, test-worker, test-tools, test-web]
+
+  lint-api:
+    desc: Lint OpenAPI spec with Redocly
+    cmds:
+      - npx @redocly/cli lint openapi.json
+
+  logs:
+    desc: Tail logs from all dev services
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml logs -f
+
+  shell-api:
+    desc: Open bash shell in api container
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml exec api bash
+
+  check-openapi:
+    desc: Check if openapi.json is up to date with current FastAPI routes
+    summary: |
+      Exports a fresh OpenAPI spec from the running FastAPI app and compares it
+      to the committed openapi.json. Exits 1 with a STALE message if they differ.
+      Requires: Python 3 with api dependencies installed (same as 'task generate').
+      Run 'task generate' to update openapi.json if stale.
+    vars:
+      TMP: '{{.TASKFILE_DIR}}/.task/openapi_check.json'
+    cmds:
+      - PYTHONPATH=api/src python3 api/scripts/export_openapi.py --output {{.TMP}}
+      - |
+        python3 -c "
+        import json, sys
+        a = json.load(open('openapi.json'))
+        b = json.load(open('{{.TMP}}'))
+        if a != b:
+            print('openapi.json is STALE — run: task generate')
+            sys.exit(1)
+        print('openapi.json is up to date')
+        "

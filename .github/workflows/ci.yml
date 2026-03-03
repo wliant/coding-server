@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Taskfile
+        uses: go-task/setup-task@v1
+        with:
+          version: '3.x'
+
+      - name: Copy env file
+        run: cp .env.example .env
+
+      - name: Start dev environment
+        run: task dev &
+
+      - name: Wait for services to be healthy
+        run: |
+          docker compose -f compose.yaml -f compose.dev.yaml wait api worker tools web || \
+          docker compose -f compose.yaml -f compose.dev.yaml ps
+
+      - name: Run all tests
+        run: task test-all
