@@ -11,8 +11,9 @@ from pythonjsonlogger import jsonlogger
 
 from api.db import engine
 from api.routes.health import router as health_router
-from api.routes.jobs import router as jobs_router
 from api.routes.projects import router as projects_router
+from api.routes.settings import router as settings_router
+from api.routes.tasks import router as tasks_router
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -71,4 +72,5 @@ async def request_logging_middleware(request: Request, call_next) -> Response:
 
 app.include_router(health_router)
 app.include_router(projects_router)
-app.include_router(jobs_router)
+app.include_router(tasks_router)
+app.include_router(settings_router)

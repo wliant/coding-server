@@ -1,0 +1,363 @@
+openapi: "3.1.0"
+info:
+  title: Coding Machine API
+  version: "0.2.0"
+  description: >
+    OpenAPI contract for feature 002-task-management-ui.
+    This document extends the existing openapi.json with new/modified endpoints.
+    Update openapi.json at repo root atomically when implementing these routes.
+
+# ─────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────
+paths:
+
+  # ── Projects ──────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      summary: List existing named projects
+      description: >
+        Returns all active projects that have been assigned a name.
+        Used to populate the "Existing Project" dropdown in the task submission form.
+        Projects created with source_type="new" that have no name yet are excluded.
+      tags: [projects]
+      responses:
+        "200":
+          description: Array of named projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSummary"
+
+  # ── Tasks ─────────────────────────────────
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: List all tasks
+      description: >
+        Returns all tasks in descending creation order.
+        The frontend applies client-side search filtering; no query parameters needed.
+      tags: [tasks]
+      responses:
+        "200":
+          description: Array of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskResponse"
+
+    post:
+      operationId: createTask
+      summary: Submit a new task
+      description: >
+        Creates a new task. If project_type is "new", a new Project record is
+        created automatically with source_type="new" and name=null.
+        If project_type is "existing", project_id must reference an existing project.
+        The task is created with status="pending".
+      tags: [tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "422":
+          description: Validation error (missing fields, invalid project_id, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /tasks/{task_id}:
+    patch:
+      operationId: updateTask
+      summary: Update a task (abort or edit + resubmit)
+      description: >
+        Partially updates a task. Only fields provided in the request body are changed.
+
+        **Abort** (task must be in `pending` status):
+          Send `{ "status": "aborted" }`. No other fields required.
+
+        **Edit + Resubmit** (task must be in `aborted` status):
+          Send updated fields plus `{ "status": "pending" }` to requeue.
+          All editable fields (requirements, dev_agent_type, test_agent_type, project_id)
+          are optional — only changed fields need to be included.
+
+        Returns 422 if the requested status transition is not permitted.
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Invalid status transition or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ── Settings ──────────────────────────────
+  /settings:
+    get:
+      operationId: getSettings
+      summary: Get all system settings
+      description: >
+        Returns all persisted settings as a flat key-value map.
+        If a known setting key has no persisted value, its default is returned.
+        Currently defined keys: agent.work.path
+      tags: [settings]
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+
+    put:
+      operationId: updateSettings
+      summary: Save system settings
+      description: >
+        Persists one or more settings via upsert. Only the keys present in the
+        request body are updated; other keys are unchanged.
+        Returns the complete current settings after the update.
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsRequest"
+      responses:
+        "200":
+          description: Settings saved; returns full current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+        "422":
+          description: Unknown setting key or invalid value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+# ─────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────
+components:
+  schemas:
+
+    # ── Enums ─────────────────────────────
+    TaskStatus:
+      type: string
+      enum:
+        - pending
+        - aborted
+        - in_progress
+        - completed
+        - failed
+      description: >
+        Lifecycle status of a task.
+        pending    → waiting for agent pickup
+        aborted    → cancelled by user before pickup; eligible for editing
+        in_progress → agent is actively working
+        completed  → agent finished successfully
+        failed     → agent encountered an unrecoverable error
+
+    DevAgentType:
+      type: string
+      enum:
+        - spec_driven_development
+      description: Development agent type. Additional values added in future iterations.
+
+    TestAgentType:
+      type: string
+      enum:
+        - generic_testing
+      description: Testing agent type. Additional values added in future iterations.
+
+    ProjectType:
+      type: string
+      enum:
+        - new
+        - existing
+      description: >
+        Indicates whether to create a new project or reference an existing one.
+
+    # ── Project ────────────────────────────
+    ProjectSummary:
+      type: object
+      required: [id, name, source_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: false
+          description: Project display name (always non-null in this response)
+        source_type:
+          type: string
+          description: How the project was created (e.g., "new", "git")
+
+    # ── Task ───────────────────────────────
+    TaskResponse:
+      type: object
+      required:
+        - id
+        - project
+        - dev_agent_type
+        - test_agent_type
+        - requirements
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+          description: The associated project (name may be null for "new" projects not yet named)
+        dev_agent_type:
+          $ref: "#/components/schemas/DevAgentType"
+        test_agent_type:
+          $ref: "#/components/schemas/TestAgentType"
+        requirements:
+          type: string
+          description: Full requirements text as submitted by the user
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+          nullable: true
+          description: Populated when status is "failed"
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - project_type
+        - dev_agent_type
+        - test_agent_type
+        - requirements
+      properties:
+        project_type:
+          $ref: "#/components/schemas/ProjectType"
+        project_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Required when project_type is "existing".
+            Must be null or omitted when project_type is "new".
+        dev_agent_type:
+          $ref: "#/components/schemas/DevAgentType"
+        test_agent_type:
+          $ref: "#/components/schemas/TestAgentType"
+        requirements:
+          type: string
+          minLength: 1
+          description: Requirements text; must not be empty
+
+    UpdateTaskRequest:
+      type: object
+      description: >
+        Partial update. All fields are optional; provide only what changes.
+        The status field controls the lifecycle transition:
+          "aborted" — abort a pending task
+          "pending"  — requeue an aborted task (edit + resubmit)
+      properties:
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        project_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Only valid when transitioning from aborted → pending
+        dev_agent_type:
+          $ref: "#/components/schemas/DevAgentType"
+        test_agent_type:
+          $ref: "#/components/schemas/TestAgentType"
+        requirements:
+          type: string
+          minLength: 1
+
+    # ── Settings ───────────────────────────
+    SettingsResponse:
+      type: object
+      description: Flat key-value map of all current settings
+      required: [settings]
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            agent.work.path: "/home/user/projects"
+
+    UpdateSettingsRequest:
+      type: object
+      description: >
+        Flat key-value map of settings to upsert. Only keys present are modified.
+        Unknown keys return 422.
+      required: [settings]
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            agent.work.path: "/home/user/projects"
+
+    # ── Errors ─────────────────────────────
+    ErrorDetail:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object

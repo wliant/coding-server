@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import "./globals.css";
+import { Sidebar } from "@/components/nav/Sidebar";
 
 export const metadata: Metadata = {
   title: "Multi-Agent Software Development System",
@@ -12,7 +14,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 p-8">{children}</main>
+        </div>
+      </body>
     </html>
   );
 }

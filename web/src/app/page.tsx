@@ -1,8 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function Home() {
-  return (
-    <main>
-      <h1>Multi-Agent Software Development System</h1>
-      <p>Submit your requirements to get started.</p>
-    </main>
-  );
+  redirect("/tasks");
 }
