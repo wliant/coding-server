@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { GET } from "../../src/app/api/health/route";
 
 test("returns ok status", async () => {

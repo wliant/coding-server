@@ -115,13 +115,16 @@ the component's dependencies installed, or inside its container:
 
 ```bash
 # Run API tests inside the running container
-docker compose -f compose.yaml -f compose.dev.yaml exec api pytest tests/
+docker compose -f compose.yaml -f compose.dev.yaml exec api python -m pytest tests/
 
 # Run worker tests
-docker compose -f compose.yaml -f compose.dev.yaml exec worker pytest tests/
+docker compose -f compose.yaml -f compose.dev.yaml exec worker python -m pytest tests/
 
 # Run tools tests
-docker compose -f compose.yaml -f compose.dev.yaml exec tools pytest tests/
+docker compose -f compose.yaml -f compose.dev.yaml exec tools python -m pytest tests/
+
+# Run web jest tests (from host, requires node_modules: cd web && npm install)
+cd web && npx jest
 ```
 
 Or use Make shortcuts:
@@ -141,8 +144,9 @@ The e2e environment uses port offsets to avoid clashing with a running dev envir
 # Using Make (recommended — starts env, runs tests, tears down)
 make e2e
 
-# Or manually
-docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up --abort-on-container-exit
+# Or manually (two steps: start services, then run test-runner)
+docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up -d --wait
+docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e run --rm --no-deps test-runner
 docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v
 ```
 
@@ -199,7 +203,10 @@ Production differences from dev:
 
 ```bash
 docker compose -f compose.yaml -f compose.prod.yaml ps
-docker compose -f compose.yaml -f compose.prod.yaml exec api curl http://localhost:8000/health
+
+# Health check (curl not available in slim images; use python urllib instead)
+docker compose -f compose.yaml -f compose.prod.yaml exec api python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())"
 ```
 
 ### Data persistence
@@ -227,6 +234,7 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps api web work
 | `postgres` never becomes healthy | `./data/postgres` owned by root | `sudo chown -R $USER:$USER ./data/postgres` |
 | Port already in use on startup | Another process on 3000/8000/etc. | Edit `.env` to change port numbers |
 | Next.js hot reload not working | inotify event propagation issue | Add `WATCHPACK_POLLING=true` to `.env` (already set by default) |
+| Web container fails in dev mode (`next: not found`) | Dev command requires full node_modules in container | This is a known limitation; the web container uses a production-only image. Run the Next.js dev server directly on the host: `cd web && npm install && npm run dev` |
 | Worker not picking up jobs | Redis not healthy when worker started | Restart worker: `docker compose ... restart worker` |
 | Migration fails on first run | `./data/postgres` has leftover partial init | Delete `./data/postgres/*` and restart |
 | E2E tests conflict with running dev | Port collision | Dev and e2e use different ports; check `.env` vs `.env.e2e` |
@@ -245,6 +253,7 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps api web work
 | `make test-api` | Run API component tests |
 | `make test-worker` | Run worker component tests |
 | `make test-tools` | Run tools component tests |
-| `make test-all` | Run all component tests |
+| `make test-web` | Run web jest tests |
+| `make test-all` | Run all component tests (API, worker, tools, web) |
 | `make logs` | Tail logs from all dev services |
 | `make shell-api` | Open a shell in the running api container |

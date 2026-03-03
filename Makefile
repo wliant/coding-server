@@ -10,8 +10,10 @@ dev-down: ## Stop local development environment
 	docker compose -f compose.yaml -f compose.dev.yaml down
 
 e2e: ## Run end-to-end tests in isolated environment (separate ports)
-	docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up --abort-on-container-exit --exit-code-from test-runner
-	docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v
+	docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up -d --wait
+	docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e run --rm --no-deps test-runner; EXIT=$$?; \
+	docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v; \
+	exit $$EXIT
 
 prod: ## Start production environment
 	docker compose -f compose.yaml -f compose.prod.yaml up -d
@@ -24,15 +26,18 @@ generate: ## Export OpenAPI spec and regenerate TypeScript client
 	cd web && npm run generate
 
 test-api: ## Run api pytest suite (requires dev environment running)
-	docker compose -f compose.yaml -f compose.dev.yaml exec api pytest tests/
+	docker compose -f compose.yaml -f compose.dev.yaml exec api python -m pytest tests/ -p no:cacheprovider
 
 test-worker: ## Run worker pytest suite (requires dev environment running)
-	docker compose -f compose.yaml -f compose.dev.yaml exec worker pytest tests/
+	docker compose -f compose.yaml -f compose.dev.yaml exec worker python -m pytest tests/ -p no:cacheprovider
 
 test-tools: ## Run tools pytest suite (requires dev environment running)
-	docker compose -f compose.yaml -f compose.dev.yaml exec tools pytest tests/
+	docker compose -f compose.yaml -f compose.dev.yaml exec tools python -m pytest tests/ -p no:cacheprovider
 
-test-all: test-api test-worker test-tools ## Run all pytest suites sequentially
+test-web: ## Run web jest suite
+	cd web && npx jest
+
+test-all: test-api test-worker test-tools test-web ## Run all pytest suites and web jest suite
 
 lint-api: ## Lint OpenAPI spec with Redocly
 	npx @redocly/cli lint openapi.json

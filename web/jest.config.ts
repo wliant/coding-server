@@ -9,6 +9,7 @@ const config: Config = {
   coverageProvider: "v8",
   testEnvironment: "jsdom",
   testMatch: ["**/tests/unit/**/*.test.ts", "**/tests/unit/**/*.test.tsx"],
+  setupFiles: ["<rootDir>/jest.setup.ts"],
 };
 
 export default createJestConfig(config);

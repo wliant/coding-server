@@ -5,11 +5,11 @@ WORKDIR /app
 RUN adduser --system --uid 1001 appuser
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e .
-
 COPY src/ ./src/
-COPY alembic.ini* ./
-COPY alembic/ ./alembic/ 2>/dev/null || true
+RUN pip install --no-cache-dir ".[dev]"
+
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 COPY scripts/ ./scripts/
 
 USER appuser

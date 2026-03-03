@@ -1,16 +1,18 @@
 # Stage 1: Install dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+COPY web/package.json ./
+RUN npm install --omit=dev
 
 # Stage 2: Build the application
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
-COPY . .
-RUN npm run build
+COPY web/package.json ./
+RUN npm install
+COPY web/ .
+# Run next build directly, bypassing the prebuild/generate step.
+# The TypeScript client is generated separately via `make generate`.
+RUN npx next build
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner

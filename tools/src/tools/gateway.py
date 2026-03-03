@@ -5,13 +5,13 @@ from tools.servers.shell_server import mcp as shell_mcp
 
 mcp = FastMCP("tool-gateway")
 
-mcp.mount("filesystem", filesystem_mcp)
-mcp.mount("git", git_mcp)
-mcp.mount("shell", shell_mcp)
+mcp.mount(filesystem_mcp, namespace="filesystem")
+mcp.mount(git_mcp, namespace="git")
+mcp.mount(shell_mcp, namespace="shell")
 
 
 @mcp.custom_route("/health", methods=["GET"])
-async def health():
+async def health(request):
     from starlette.responses import JSONResponse
     return JSONResponse({"status": "ok"})
 

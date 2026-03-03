@@ -18,6 +18,7 @@ services:
       - "${TOOLS_PORT:-8002}:8002"
     volumes:
       - ./tools/src:/app/src
+      - ./tools/tests:/app/tests
     env_file:
       - .env
 
@@ -36,6 +37,7 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./api/src:/app/src
+      - ./api/tests:/app/tests
     env_file:
       - .env
 
@@ -44,6 +46,7 @@ services:
       - "${WORKER_PORT:-8001}:8001"
     volumes:
       - ./worker/src:/app/src
+      - ./worker/tests:/app/tests
       - ./agent-work:/agent-work
     env_file:
       - .env

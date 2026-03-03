@@ -126,7 +126,7 @@ All paths relative to repository root (`coding-machine/`).
 
 - [X] T035 [US1] Update `Makefile` `dev` target: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up`; `dev-down` target: `docker compose -f compose.yaml -f compose.dev.yaml down`; `logs` target: `docker compose -f compose.yaml -f compose.dev.yaml logs -f`; `shell-api` target: `docker compose -f compose.yaml -f compose.dev.yaml exec api bash`
 
-- [ ] T036 [US1] Validate User Story 1: run `make dev`; wait for all services to reach `healthy`; run `curl http://localhost:8000/health` (expect `{"status":"ok",...}`); run `curl http://localhost:3000/api/health` (expect `{"status":"ok"}`); run `curl http://localhost:8001/health` and `curl http://localhost:8002/health`; open browser to `http://localhost:3000`; stop `api` container and restart it; verify it rejoins without full restart; document any issues in quickstart.md Troubleshooting section
+- [X] T036 [US1] Validate User Story 1: run `make dev`; wait for all services to reach `healthy`; run `curl http://localhost:8000/health` (expect `{"status":"ok",...}`); run `curl http://localhost:3000/api/health` (expect `{"status":"ok"}`); run `curl http://localhost:8001/health` and `curl http://localhost:8002/health`; open browser to `http://localhost:3000`; stop `api` container and restart it; verify it rejoins without full restart; document any issues in quickstart.md Troubleshooting section
 
 **Checkpoint**: User Story 1 complete — local dev environment fully functional.
 
@@ -152,7 +152,7 @@ All paths relative to repository root (`coding-machine/`).
 
 - [X] T043 [US2] Update `Makefile` `e2e` target: `docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up --abort-on-container-exit --exit-code-from test-runner; docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v`
 
-- [ ] T044 [US2] Validate User Story 2: ensure `make dev` is stopped; run `make e2e`; observe isolated environment start; verify test results printed to stdout; verify exit code is 0; run again with dev environment running simultaneously to confirm port isolation works
+- [X] T044 [US2] Validate User Story 2: ensure `make dev` is stopped; run `make e2e`; observe isolated environment start; verify test results printed to stdout; verify exit code is 0; run again with dev environment running simultaneously to confirm port isolation works
 
 **Checkpoint**: User Story 2 complete — e2e test suite runnable independently of dev environment.
 
@@ -172,7 +172,7 @@ All paths relative to repository root (`coding-machine/`).
 
 - [X] T048 [US3] Update `Makefile` `prod` target: `docker compose -f compose.yaml -f compose.prod.yaml up -d`; `prod-down` target: `docker compose -f compose.yaml -f compose.prod.yaml down` (with a note: do NOT use `-v` in prod)
 
-- [ ] T049 [US3] Validate User Story 3: run `make prod`; wait for all services healthy; run health checks against all ports; create a test project via `curl -X POST http://localhost:8000/projects -d '{"name":"test","source_type":"new"}'`; run `make prod-down` then `make prod` again; verify the project record persists; inspect compose.prod.yaml to confirm no `--reload`, no debug ports, no bind mounts to source code
+- [X] T049 [US3] Validate User Story 3: run `make prod`; wait for all services healthy; run health checks against all ports; create a test project via `curl -X POST http://localhost:8000/projects -d '{"name":"test","source_type":"new"}'`; run `make prod-down` then `make prod` again; verify the project record persists; inspect compose.prod.yaml to confirm no `--reload`, no debug ports, no bind mounts to source code
 
 **Checkpoint**: User Story 3 complete — production deployment independently runnable and data-persistent.
 
@@ -216,7 +216,7 @@ All paths relative to repository root (`coding-machine/`).
 
 - [X] T061 [US4] Complete `Makefile` test targets: `test-api`: `docker compose -f compose.yaml -f compose.dev.yaml exec api pytest tests/`; `test-worker`: `... exec worker pytest tests/`; `test-tools`: `... exec tools pytest tests/`; `test-all`: runs test-api, test-worker, test-tools sequentially; each target exits non-zero if tests fail
 
-- [ ] T062 [US4] Validate User Story 4: run `make test-api` — verify pass, check no files under `api/src/` have modified timestamps; run `make test-worker` — same check on `worker/src/`; run `make test-tools` — same on `tools/src/`; run `cd web && npx jest` — verify pass; browse repository and confirm each component has visually distinct `src/` and `tests/` subtrees
+- [X] T062 [US4] Validate User Story 4: run `make test-api` — verify pass, check no files under `api/src/` have modified timestamps; run `make test-worker` — same check on `worker/src/`; run `make test-tools` — same on `tools/src/`; run `cd web && npx jest` — verify pass; browse repository and confirm each component has visually distinct `src/` and `tests/` subtrees
 
 **Checkpoint**: User Story 4 complete — all components have independently runnable test suites with clean src/test separation.
 
@@ -232,7 +232,7 @@ All paths relative to repository root (`coding-machine/`).
 
 - [X] T065 [P] Add OpenAPI spec staleness CI check: create `api/scripts/check_openapi_fresh.sh` — runs `export_openapi.py` to a temp file, diffs against committed `openapi.json`, exits 1 if different; add `make check-openapi` target; document in quickstart.md that this must pass before merging any backend change
 
-- [ ] T066 Follow the quickstart.md walkthrough end-to-end from a fresh clone: verify every step in `quickstart.md` succeeds exactly as written; fix any steps that fail or are missing; update Troubleshooting section with any findings
+- [X] T066 Follow the quickstart.md walkthrough end-to-end from a fresh clone: verify every step in `quickstart.md` succeeds exactly as written; fix any steps that fail or are missing; update Troubleshooting section with any findings
 
 ---
 

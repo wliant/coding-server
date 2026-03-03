@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -7,8 +7,7 @@ class Settings(BaseSettings):
     AGENT_WORK_PARENT: str = "/agent-work"
     TOOLS_GATEWAY_URL: str = "http://localhost:8002"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 
 settings = Settings()

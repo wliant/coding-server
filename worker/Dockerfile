@@ -5,9 +5,8 @@ WORKDIR /app
 RUN adduser --system --uid 1001 appuser
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e .
-
 COPY src/ ./src/
+RUN pip install --no-cache-dir ".[dev]"
 
 USER appuser
 EXPOSE 8001
