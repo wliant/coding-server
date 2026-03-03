@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-03-02
 
 ## Active Technologies
+- Python 3.12 (api), TypeScript / Node.js 20 (web) + FastAPI 0.115+ / SQLAlchemy 2 async / asyncpg / Alembic (api); Next.js 15 App Router / React 19 / Tailwind CSS / shadcn/ui / @hey-api/client-fetch (web) (002-task-management-ui)
+- PostgreSQL 16 — existing `jobs` and `projects` tables extended; new `settings` table added via migration `0002` (002-task-management-ui)
 
 - Python 3.12 (api, worker, tools); TypeScript / Node.js 20 (web) (001-project-setup)
 
@@ -63,6 +65,7 @@ cd web && npx tsc --noEmit
 - **TypeScript** (web): strict mode enabled; generated client code in `src/client/` (do not hand-edit); Prettier for formatting
 
 ## Recent Changes
+- 002-task-management-ui: Added Python 3.12 (api), TypeScript / Node.js 20 (web) + FastAPI 0.115+ / SQLAlchemy 2 async / asyncpg / Alembic (api); Next.js 15 App Router / React 19 / Tailwind CSS / shadcn/ui / @hey-api/client-fetch (web)
 
 - 001-project-setup: Added Python 3.12 (api, worker, tools); TypeScript / Node.js 20 (web)
 

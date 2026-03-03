@@ -1,30 +1,14 @@
-import uuid
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter()
+from api.db import get_db
+from api.schemas.task import ProjectSummary
+from api.services import project_service
 
-
-@router.get("/projects")
-async def list_projects():
-    return []
+router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-@router.post("/projects", status_code=501)
-async def create_project():
-    return JSONResponse(status_code=501, content={"detail": "Not implemented"})
-
-
-@router.get("/projects/{project_id}")
-async def get_project(project_id: uuid.UUID):
-    return JSONResponse(status_code=404, content={"detail": "Not found"})
-
-
-@router.get("/projects/{project_id}/jobs")
-async def list_project_jobs(project_id: uuid.UUID):
-    return []
-
-
-@router.post("/projects/{project_id}/jobs", status_code=501)
-async def create_job(project_id: uuid.UUID):
-    return JSONResponse(status_code=501, content={"detail": "Not implemented"})
+@router.get("", response_model=list[ProjectSummary])
+async def list_projects(db: AsyncSession = Depends(get_db)):
+    projects = await project_service.list_named_projects(db)
+    return [ProjectSummary.model_validate(p) for p in projects]

@@ -27,58 +27,18 @@
       "get": {
         "summary": "List Projects",
         "operationId": "list_projects_projects_get",
+        "tags": ["projects"],
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Create Project",
-        "operationId": "create_project_projects_post",
-        "responses": {
-          "501": {
-            "description": "Not Implemented"
-          }
-        }
-      }
-    },
-    "/projects/{project_id}": {
-      "get": {
-        "summary": "Get Project",
-        "operationId": "get_project_projects__project_id__get",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Project Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Projects Projects Get"
                 }
               }
             }
@@ -86,37 +46,22 @@
         }
       }
     },
-    "/projects/{project_id}/jobs": {
+    "/tasks": {
       "get": {
-        "summary": "List Project Jobs",
-        "operationId": "list_project_jobs_projects__project_id__jobs_get",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Project Id"
-            }
-          }
-        ],
+        "summary": "List Tasks",
+        "operationId": "list_tasks_tasks_get",
+        "tags": ["tasks"],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Tasks Tasks Get"
                 }
               }
             }
@@ -124,59 +69,27 @@
         }
       },
       "post": {
-        "summary": "Create Job",
-        "operationId": "create_job_projects__project_id__jobs_post",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Project Id"
-            }
-          }
-        ],
-        "responses": {
-          "501": {
-            "description": "Not Implemented"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+        "summary": "Create Task",
+        "operationId": "create_task_tasks_post",
+        "tags": ["tasks"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
               }
             }
-          }
-        }
-      }
-    },
-    "/jobs/{job_id}": {
-      "get": {
-        "summary": "Get Job",
-        "operationId": "get_job_jobs__job_id__get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
-          "200": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
               }
             }
           },
@@ -193,28 +106,96 @@
         }
       }
     },
-    "/jobs/{job_id}/logs": {
-      "get": {
-        "summary": "Get Job Logs",
-        "operationId": "get_job_logs_jobs__job_id__logs_get",
+    "/tasks/{task_id}": {
+      "patch": {
+        "summary": "Update Task",
+        "operationId": "update_task_tasks__task_id__patch",
+        "tags": ["tasks"],
         "parameters": [
           {
-            "name": "job_id",
+            "name": "task_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
+              "title": "Task Id"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "summary": "Get Settings",
+        "operationId": "get_settings_settings_get",
+        "tags": ["settings"],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Settings",
+        "operationId": "update_settings_settings_put",
+        "tags": ["settings"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
               }
             }
           },
@@ -251,6 +232,240 @@
         "type": "object",
         "required": ["status", "components"],
         "title": "HealthResponse"
+      },
+      "ProjectSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "source_type"],
+        "title": "ProjectSummary"
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": ["pending", "aborted", "in_progress", "completed", "failed"],
+        "title": "TaskStatus"
+      },
+      "DevAgentType": {
+        "type": "string",
+        "enum": ["spec_driven_development"],
+        "title": "DevAgentType"
+      },
+      "TestAgentType": {
+        "type": "string",
+        "enum": ["generic_testing"],
+        "title": "TestAgentType"
+      },
+      "ProjectType": {
+        "type": "string",
+        "enum": ["new", "existing"],
+        "title": "ProjectType"
+      },
+      "TaskResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectSummary"
+          },
+          "dev_agent_type": {
+            "$ref": "#/components/schemas/DevAgentType"
+          },
+          "test_agent_type": {
+            "$ref": "#/components/schemas/TestAgentType"
+          },
+          "requirements": {
+            "type": "string",
+            "title": "Requirements"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project",
+          "dev_agent_type",
+          "test_agent_type",
+          "requirements",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskResponse"
+      },
+      "CreateTaskRequest": {
+        "properties": {
+          "project_type": {
+            "$ref": "#/components/schemas/ProjectType"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "dev_agent_type": {
+            "$ref": "#/components/schemas/DevAgentType"
+          },
+          "test_agent_type": {
+            "$ref": "#/components/schemas/TestAgentType"
+          },
+          "requirements": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Requirements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_type",
+          "dev_agent_type",
+          "test_agent_type",
+          "requirements"
+        ],
+        "title": "CreateTaskRequest"
+      },
+      "UpdateTaskRequest": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "dev_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DevAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Agent Type"
+          },
+          "test_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Agent Type"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          }
+        },
+        "type": "object",
+        "title": "UpdateTaskRequest"
+      },
+      "SettingsResponse": {
+        "properties": {
+          "settings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Settings"
+          }
+        },
+        "type": "object",
+        "required": ["settings"],
+        "title": "SettingsResponse"
+      },
+      "UpdateSettingsRequest": {
+        "properties": {
+          "settings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Settings"
+          }
+        },
+        "type": "object",
+        "required": ["settings"],
+        "title": "UpdateSettingsRequest"
       },
       "HTTPValidationError": {
         "properties": {
