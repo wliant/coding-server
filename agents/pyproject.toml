@@ -1,0 +1,6 @@
+[tool.uv.workspace]
+members = [
+    "simple_crewai_pair_agent",
+    "crewai_coding_team",
+    "simple_langchain_deepagent",
+]

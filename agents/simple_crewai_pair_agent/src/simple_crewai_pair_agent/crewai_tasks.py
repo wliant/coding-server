@@ -1,4 +1,5 @@
 """Task factory functions for the CrewAI coding crew."""
+
 from pathlib import Path
 
 from crewai import Agent, Task

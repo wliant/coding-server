@@ -1,15 +1,12 @@
 [project]
-name = "simple-crewai-coding-agent"
+name = "simple-crewai-pair-agent"
 version = "0.1.0"
-description = "A simple CrewAI-based coding agent with Coder and Reviewer agents"
+description = "CrewAI pair-programming agent (Coder + Reviewer)"
 requires-python = ">=3.12"
 dependencies = [
     "crewai[litellm]>=0.100.0",
-    "python-dotenv>=1.0.0",
+    "pydantic>=2",
 ]
-
-[project.scripts]
-simple-crewai-coding-agent = "simple_crewai_coding_agent.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -31,7 +28,7 @@ where = ["src"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
-    "smoke: marks tests as requiring a live Ollama instance (deselect with '-m \"not smoke\"')",
+    "smoke: requires a live Ollama instance",
 ]
 
 [tool.ruff]
