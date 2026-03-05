@@ -8,7 +8,9 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pythonjsonlogger import jsonlogger
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from api.db import engine
 from api.routes.health import router as health_router
@@ -78,6 +80,24 @@ async def request_logging_middleware(request: Request, call_next) -> Response:
         },
     )
     return response
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    logger.error("database integrity error", extra={"error": str(exc.orig)})
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc.orig).split("\n")[0]},
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    logger.error("database error", extra={"error": str(exc)})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "A database error occurred. Please try again."},
+    )
 
 
 app.include_router(health_router)

@@ -38,6 +38,7 @@ services:
     volumes:
       - ./api/src:/app/src
       - ./api/tests:/app/tests
+      - ./api/alembic:/app/alembic
     env_file:
       - .env
 
