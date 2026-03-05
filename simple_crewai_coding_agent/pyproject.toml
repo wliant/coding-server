@@ -1,0 +1,39 @@
+[project]
+name = "simple-crewai-coding-agent"
+version = "0.1.0"
+description = "A simple CrewAI-based coding agent with Coder and Reviewer agents"
+requires-python = ">=3.12"
+dependencies = [
+    "crewai[litellm]>=0.100.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.12",
+    "ruff>=0.4",
+    "crewai[anthropic]",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "smoke: marks tests as requiring a live Ollama instance (deselect with '-m \"not smoke\"')",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

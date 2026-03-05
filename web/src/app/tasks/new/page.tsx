@@ -41,7 +41,16 @@ export default function NewTaskPage() {
       if (result.data) {
         router.push("/tasks");
       } else {
-        setError("Failed to create task. Please try again.");
+        const err = result.error as { detail?: string | Array<{ msg: string }> } | undefined;
+        if (err?.detail) {
+          if (Array.isArray(err.detail)) {
+            setError(err.detail.map((d) => d.msg).join("; "));
+          } else {
+            setError(err.detail);
+          }
+        } else {
+          setError("Failed to create task. Please try again.");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
