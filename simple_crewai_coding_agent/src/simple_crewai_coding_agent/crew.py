@@ -1,4 +1,5 @@
 import logging
+import time
 from pathlib import Path
 
 from crewai import Crew, Process
@@ -55,8 +56,11 @@ class CodingCrew:
                 "working_directory": str(self.working_directory),
             },
         )
+        _start = time.monotonic()
         try:
             crew_output = self._crew.kickoff(inputs={"requirement": self.requirement})
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception as exc:
             logger.error(
                 "crew failed",
@@ -78,6 +82,7 @@ class CodingCrew:
                 "project_name": self.project_name,
                 "output_file": str(output_file),
                 "code_length": len(code),
+                "elapsed_seconds": round(time.monotonic() - _start, 2),
             },
         )
 

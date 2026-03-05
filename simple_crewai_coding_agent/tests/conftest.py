@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from crewai import LLM
 
 # Ensure OPENAI_API_KEY is set before any crewai imports so validation passes
 os.environ.setdefault("OPENAI_API_KEY", "NA")
@@ -17,10 +18,8 @@ def tmp_working_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def fake_llm():
+def fake_llm() -> LLM:
     """Return a real crewai.LLM configured for testing (no real connection made on construction)."""
-    from crewai import LLM
-
     return LLM(model="ollama/fake-model", base_url="http://localhost:1", temperature=0.0)
 
 

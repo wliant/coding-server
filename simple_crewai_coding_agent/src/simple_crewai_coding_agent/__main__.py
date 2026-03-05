@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -15,6 +16,13 @@ from dotenv import load_dotenv
 
 # Load .env if present before any LLM configuration is read
 load_dotenv()
+
+from simple_crewai_coding_agent.logging_config import configure_logging  # noqa: E402
+
+configure_logging()
+
+# CrewAI validates OPENAI_API_KEY at import time; set a dummy for non-OpenAI providers
+os.environ.setdefault("OPENAI_API_KEY", "NA")
 
 
 def main() -> None:
@@ -43,6 +51,8 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Deferred import: keeps module-level side effects (logging, env setup) contained
+    # to CLI invocation and avoids importing crewai until args are validated.
     from simple_crewai_coding_agent import run_crew
 
     try:

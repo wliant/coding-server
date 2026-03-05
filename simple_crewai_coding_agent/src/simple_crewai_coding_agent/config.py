@@ -22,11 +22,17 @@ def make_llm() -> LLM:
     """
     provider = os.getenv("LLM_PROVIDER", "ollama")
     model = os.getenv("LLM_MODEL", "qwen2.5-coder:7b")
-    temperature = float(os.getenv("LLM_TEMPERATURE", "0.2"))
+    _raw_temp = os.getenv("LLM_TEMPERATURE", "0.2")
+    try:
+        temperature = float(_raw_temp)
+    except ValueError:
+        raise ValueError(
+            f"LLM_TEMPERATURE must be a float (e.g. '0.2'), got: {_raw_temp!r}"
+        ) from None
 
     if provider == "ollama":
-        # CrewAI validates OPENAI_API_KEY at import time; set a dummy if not already present
-        os.environ.setdefault("OPENAI_API_KEY", "NA")
+        # Callers must set OPENAI_API_KEY before calling make_llm() if required.
+        # For CLI use, __main__.py sets os.environ.setdefault("OPENAI_API_KEY", "NA").
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         return LLM(
             model=f"ollama/{model}",

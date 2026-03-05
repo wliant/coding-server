@@ -1,3 +1,4 @@
+"""Agent factory functions for the CrewAI coding crew."""
 from crewai import LLM, Agent
 
 

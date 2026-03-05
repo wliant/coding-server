@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass
+@dataclass(frozen=True)
 class CrewRunResult:
     """Stable public return type for run_crew().
 

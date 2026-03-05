@@ -81,3 +81,13 @@ def test_unknown_provider_raises_value_error():
 
         with pytest.raises(ValueError, match="unknown"):
             make_llm()
+
+
+def test_invalid_temperature_raises_clear_value_error():
+    with patch.dict(
+        os.environ, {"LLM_TEMPERATURE": "not-a-float", "OPENAI_API_KEY": "NA"}
+    ):
+        from simple_crewai_coding_agent.config import make_llm
+
+        with pytest.raises(ValueError, match="LLM_TEMPERATURE"):
+            make_llm()
