@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Multi-Agent Software Development System API",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/health": {
@@ -107,6 +107,45 @@
       }
     },
     "/tasks/{task_id}": {
+      "get": {
+        "summary": "Get Task Detail",
+        "operationId": "getTaskDetail",
+        "tags": ["tasks"],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "summary": "Update Task",
         "operationId": "update_task_tasks__task_id__patch",
@@ -149,6 +188,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/push": {
+      "post": {
+        "summary": "Push Task To Remote",
+        "operationId": "pushTaskToRemote",
+        "tags": ["tasks"],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Push succeeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Task is not in Completed status; push not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Project has no git_url configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Git push to remote failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -260,6 +370,45 @@
         "required": ["id", "name", "source_type"],
         "title": "ProjectSummary"
       },
+      "ProjectSummaryWithGitUrl": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "git_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Url",
+            "description": "Remote git repository URL; used as push target"
+          }
+        },
+        "type": "object",
+        "required": ["id", "source_type"],
+        "title": "ProjectSummaryWithGitUrl"
+      },
       "TaskStatus": {
         "type": "string",
         "enum": ["pending", "aborted", "in_progress", "completed", "failed"],
@@ -338,6 +487,147 @@
         ],
         "title": "TaskResponse"
       },
+      "TaskDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectSummaryWithGitUrl"
+          },
+          "dev_agent_type": {
+            "$ref": "#/components/schemas/DevAgentType"
+          },
+          "test_agent_type": {
+            "$ref": "#/components/schemas/TestAgentType"
+          },
+          "requirements": {
+            "type": "string",
+            "title": "Requirements"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "work_directory_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Directory Path",
+            "description": "Absolute path of the on-disk working directory; null until worker claims the task"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds",
+            "description": "Seconds elapsed since started_at; non-null only when status is in_progress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project",
+          "dev_agent_type",
+          "test_agent_type",
+          "requirements",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskDetailResponse"
+      },
+      "PushResponse": {
+        "properties": {
+          "branch_name": {
+            "type": "string",
+            "title": "Branch Name",
+            "description": "Name of the git branch created and pushed to the remote",
+            "example": "task/a1b2c3d4"
+          },
+          "remote_url": {
+            "type": "string",
+            "title": "Remote Url",
+            "description": "The remote git URL that was pushed to"
+          },
+          "pushed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Pushed At",
+            "description": "UTC timestamp of the successful push"
+          }
+        },
+        "type": "object",
+        "required": ["branch_name", "remote_url", "pushed_at"],
+        "title": "PushResponse"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": ["detail"],
+        "title": "ErrorResponse"
+      },
       "CreateTaskRequest": {
         "properties": {
           "project_type": {
@@ -365,6 +655,18 @@
             "type": "string",
             "minLength": 1,
             "title": "Requirements"
+          },
+          "git_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Url",
+            "description": "Remote git repository URL; stored on the new Project when project_type is \"new\""
           }
         },
         "type": "object",

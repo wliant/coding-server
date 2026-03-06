@@ -116,12 +116,14 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
               {filteredTasks.map((task) => (
                 <tr key={task.id} className="border-b hover:bg-muted/25">
                   <td className="px-4 py-3">
-                    <div className="font-medium">
-                      {task.project.name ?? "New Project"}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate max-w-xs">
-                      {task.requirements}
-                    </div>
+                    <Link href={`/tasks/${task.id}`} className="block hover:underline">
+                      <div className="font-medium">
+                        {task.project.name ?? "New Project"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate max-w-xs">
+                        {task.requirements}
+                      </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     Spec Driven

@@ -39,6 +39,8 @@ class Job(Base):
         server_default=func.now(),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    lease_holder: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WorkDirectory(Base):
