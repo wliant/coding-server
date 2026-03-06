@@ -337,3 +337,186 @@ async def test_patch_task_resubmit_non_existent_returns_404(client):
         f"/tasks/{fake_id}", json={"status": "pending", "requirements": "Updated"}
     )
     assert response.status_code == 404
+
+
+# ============================================================
+# GET /tasks/{id} detail tests (T015)
+# ============================================================
+
+
+async def test_get_task_detail_returns_200_with_task_detail_shape(client):
+    """GET /tasks/{id} returns 200 with TaskDetailResponse shape."""
+    create_payload = {
+        "project_type": "new",
+        "dev_agent_type": "spec_driven_development",
+        "test_agent_type": "generic_testing",
+        "requirements": "Build a detail endpoint",
+    }
+    create_response = await client.post("/tasks", json=create_payload)
+    assert create_response.status_code == 201
+    task_id = create_response.json()["id"]
+
+    response = await client.get(f"/tasks/{task_id}")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == task_id
+    assert data["requirements"] == "Build a detail endpoint"
+    assert data["status"] == "pending"
+    assert "project" in data
+    assert "git_url" in data["project"]
+    assert "started_at" in data
+    assert "completed_at" in data
+    assert "work_directory_path" in data
+    assert "elapsed_seconds" in data
+    assert data["work_directory_path"] is None
+    assert data["elapsed_seconds"] is None
+
+
+async def test_get_task_detail_returns_404_for_unknown_id(client):
+    """GET /tasks/{id} returns 404 for a non-existent task ID."""
+    fake_id = str(uuid.uuid4())
+    response = await client.get(f"/tasks/{fake_id}")
+    assert response.status_code == 404
+
+
+async def test_get_task_detail_includes_elapsed_seconds_for_in_progress(client, test_session):
+    """GET /tasks/{id} includes elapsed_seconds for in_progress tasks."""
+    from datetime import datetime, timezone, timedelta
+
+    project = Project(name=None, source_type="new", status="active")
+    test_session.add(project)
+    await test_session.flush()
+
+    job = Job(
+        project_id=project.id,
+        requirement="Running task",
+        status="in_progress",
+        dev_agent_type="spec_driven_development",
+        test_agent_type="generic_testing",
+        started_at=datetime.now(timezone.utc) - timedelta(seconds=30),
+    )
+    test_session.add(job)
+    await test_session.commit()
+    await test_session.refresh(job)
+
+    response = await client.get(f"/tasks/{job.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "in_progress"
+    assert data["elapsed_seconds"] is not None
+    assert data["elapsed_seconds"] >= 30
+
+
+async def test_get_task_detail_work_directory_path_is_null_before_worker_claims(client):
+    """GET /tasks/{id} has work_directory_path=null for a pending task."""
+    create_payload = {
+        "project_type": "new",
+        "dev_agent_type": "spec_driven_development",
+        "test_agent_type": "generic_testing",
+        "requirements": "Pending task",
+    }
+    response = await client.post("/tasks", json=create_payload)
+    task_id = response.json()["id"]
+
+    detail = await client.get(f"/tasks/{task_id}")
+    assert detail.status_code == 200
+    assert detail.json()["work_directory_path"] is None
+
+
+# ============================================================
+# POST /tasks/{id}/push tests (T023)
+# ============================================================
+
+
+async def test_push_returns_409_when_task_not_completed(client):
+    """POST /tasks/{id}/push returns 409 when task is not Completed."""
+    create_payload = {
+        "project_type": "new",
+        "dev_agent_type": "spec_driven_development",
+        "test_agent_type": "generic_testing",
+        "requirements": "Pending task",
+    }
+    response = await client.post("/tasks", json=create_payload)
+    task_id = response.json()["id"]
+
+    push_response = await client.post(f"/tasks/{task_id}/push")
+    assert push_response.status_code == 409
+
+
+async def test_push_returns_404_for_unknown_task(client):
+    """POST /tasks/{id}/push returns 404 for unknown task."""
+    fake_id = str(uuid.uuid4())
+    response = await client.post(f"/tasks/{fake_id}/push")
+    assert response.status_code == 404
+
+
+async def test_push_returns_422_when_project_has_no_git_url(client, test_session):
+    """POST /tasks/{id}/push returns 422 when project.git_url is None."""
+    project = Project(name=None, source_type="new", status="active", git_url=None)
+    test_session.add(project)
+    await test_session.flush()
+
+    job = Job(
+        project_id=project.id,
+        requirement="Completed task",
+        status="completed",
+        dev_agent_type="spec_driven_development",
+        test_agent_type="generic_testing",
+    )
+    test_session.add(job)
+    await test_session.commit()
+    await test_session.refresh(job)
+
+    response = await client.post(f"/tasks/{job.id}/push")
+    assert response.status_code == 422
+
+
+async def test_push_returns_200_with_push_response_shape_on_success(client, test_session):
+    """POST /tasks/{id}/push returns 200 with PushResponse when push succeeds (mocked)."""
+    from unittest.mock import patch, AsyncMock
+    from datetime import datetime, timezone
+
+    project = Project(
+        name="my-proj",
+        source_type="new",
+        status="active",
+        git_url="https://github.com/org/repo.git",
+    )
+    test_session.add(project)
+    await test_session.flush()
+
+    job = Job(
+        project_id=project.id,
+        requirement="Completed task",
+        status="completed",
+        dev_agent_type="spec_driven_development",
+        test_agent_type="generic_testing",
+    )
+    test_session.add(job)
+    await test_session.flush()
+
+    from api.models.job import WorkDirectory
+    wd = WorkDirectory(job_id=job.id, path="/agent-work/abc123")
+    test_session.add(wd)
+    await test_session.commit()
+    await test_session.refresh(job)
+
+    pushed_at = datetime.now(timezone.utc)
+    from api.schemas.task import PushResponse
+    mock_push_result = PushResponse(
+        branch_name=f"task/{str(job.id)[:8]}",
+        remote_url="https://github.com/org/repo.git",
+        pushed_at=pushed_at,
+    )
+
+    with patch("api.services.task_service.git_service") as mock_git:
+        mock_git.push_working_directory_to_remote.return_value = mock_push_result
+        response = await client.post(f"/tasks/{job.id}/push")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "branch_name" in data
+    assert "remote_url" in data
+    assert "pushed_at" in data
+    assert data["branch_name"] == f"task/{str(job.id)[:8]}"

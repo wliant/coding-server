@@ -17,6 +17,9 @@ dependencies = [
     "pydantic-settings>=2.0",
     "langgraph-checkpoint-postgres>=2.0",
     "python-json-logger>=2.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "simple-crewai-pair-agent @ file:../agents/simple_crewai_pair_agent",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +28,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "fakeredis[aioredis]>=2.0",
     "ruff>=0.4",
+    "aiosqlite>=0.20",
 ]
 
 [tool.setuptools.packages.find]

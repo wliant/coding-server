@@ -1,0 +1,209 @@
+openapi: "3.1.0"
+info:
+  title: "Multi-Agent Software Development System API — 005 additions"
+  version: "0.2.0"
+  description: |
+    New and modified endpoints introduced by feature 005-requirements-feature.
+    These additions extend the existing openapi.json (v0.1.0).
+
+# ─────────────────────────────────────────────
+# Modified endpoint
+# ─────────────────────────────────────────────
+# POST /tasks — CreateTaskRequest gains optional git_url field (see schema below)
+
+# ─────────────────────────────────────────────
+# New endpoints
+# ─────────────────────────────────────────────
+paths:
+  /tasks/{task_id}:
+    get:
+      operationId: getTaskDetail
+      summary: Get full task detail
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskDetailResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tasks/{task_id}/push:
+    post:
+      operationId: pushTaskToRemote
+      summary: Push completed task working directory to remote git as a new branch
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Push succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "409":
+          description: Task is not in Completed status; push not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Project has no git_url configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Git push to remote failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+
+    # ── Shared / existing ──────────────────────────────────────────────────────
+    ProjectSummaryWithGitUrl:
+      type: object
+      required: [id, source_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        git_url:
+          type: string
+          nullable: true
+          description: Remote git repository URL; used as push target
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+    # ── Task detail ────────────────────────────────────────────────────────────
+    TaskDetailResponse:
+      type: object
+      required: [id, project, dev_agent_type, test_agent_type, requirements, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project:
+          $ref: "#/components/schemas/ProjectSummaryWithGitUrl"
+        dev_agent_type:
+          type: string
+          enum: [spec_driven_development]
+        test_agent_type:
+          type: string
+          enum: [generic_testing]
+        requirements:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed, aborted]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        work_directory_path:
+          type: string
+          nullable: true
+          description: Absolute path of the on-disk working directory; null until worker claims the task
+        elapsed_seconds:
+          type: integer
+          nullable: true
+          description: Seconds elapsed since started_at; non-null only when status is in_progress
+
+    # ── Push result ────────────────────────────────────────────────────────────
+    PushResponse:
+      type: object
+      required: [branch_name, remote_url, pushed_at]
+      properties:
+        branch_name:
+          type: string
+          example: "task/a1b2c3d4"
+          description: Name of the git branch created and pushed to the remote
+        remote_url:
+          type: string
+          description: The remote git URL that was pushed to
+        pushed_at:
+          type: string
+          format: date-time
+          description: UTC timestamp of the successful push
+
+    # ── Modified request ───────────────────────────────────────────────────────
+    CreateTaskRequest:
+      description: |
+        Extended from v0.1.0 — adds optional git_url field.
+        When project_type is "new", git_url is stored on the created Project.
+        When project_type is "existing", git_url is ignored.
+      type: object
+      required: [project_type, dev_agent_type, test_agent_type, requirements]
+      properties:
+        project_type:
+          type: string
+          enum: [new, existing]
+        project_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Required when project_type is "existing"
+        dev_agent_type:
+          type: string
+          enum: [spec_driven_development]
+        test_agent_type:
+          type: string
+          enum: [generic_testing]
+        requirements:
+          type: string
+          minLength: 1
+        git_url:
+          type: string
+          nullable: true
+          description: Remote git repository URL; stored on the new Project when project_type is "new"

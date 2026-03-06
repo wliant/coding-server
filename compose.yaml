@@ -69,6 +69,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-madm}
       REDIS_URL: redis://redis:6379/0
+    volumes:
+      - agent_work:/agent-work
     networks:
       - backend
     depends_on:
@@ -84,7 +86,8 @@ services:
 
   worker:
     build:
-      context: ./worker
+      context: .
+      dockerfile: worker/Dockerfile
     expose:
       - "8001"
     environment:
@@ -92,6 +95,16 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-madm}
       AGENT_WORK_PARENT: /agent-work
       TOOLS_GATEWAY_URL: http://tools:8002
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder:7b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-NA}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
+      LEASE_TTL_SECONDS: ${LEASE_TTL_SECONDS:-300}
+      LEASE_RENEWAL_INTERVAL_SECONDS: ${LEASE_RENEWAL_INTERVAL_SECONDS:-120}
+    volumes:
+      - agent_work:/agent-work
     networks:
       - backend
     depends_on:
