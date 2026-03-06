@@ -3,15 +3,10 @@
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { TaskForm, type TaskFormValues } from "@/components/tasks/TaskForm";
-import {
-  listTasksTasksGet,
-  listProjectsProjectsGet,
-  updateTaskTasksTaskIdPatch,
-} from "@/client/sdk.gen";
+import { listAgents, listTasksTasksGet, updateTaskTasksTaskIdPatch } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
-import type { TaskResponse, ProjectSummary } from "@/client/types.gen";
+import type { AgentResponse, TaskResponse } from "@/client/types.gen";
 
-// Configure the client base URL
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
 
 export default function EditTaskPage() {
@@ -20,7 +15,7 @@ export default function EditTaskPage() {
   const taskId = params.id as string;
 
   const [task, setTask] = useState<TaskResponse | null>(null);
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [agents, setAgents] = useState<AgentResponse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,36 +23,27 @@ export default function EditTaskPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [tasksResult, projectsResult] = await Promise.all([
+        const [tasksResult, agentsResult] = await Promise.all([
           listTasksTasksGet(),
-          listProjectsProjectsGet(),
+          listAgents(),
         ]);
 
         if (tasksResult.data) {
           const found = tasksResult.data.find((t) => t.id === taskId);
-          if (!found) {
-            router.push("/tasks");
-            return;
-          }
-          if (found.status !== "aborted") {
+          if (!found || found.status !== "aborted") {
             router.push("/tasks");
             return;
           }
           setTask(found);
         }
 
-        if (projectsResult.data) {
-          setProjects(projectsResult.data);
-        }
+        if (agentsResult.data) setAgents(agentsResult.data);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load task data"
-        );
+        setError(err instanceof Error ? err.message : "Failed to load task data");
       } finally {
         setIsLoading(false);
       }
     };
-
     loadData();
   }, [taskId, router]);
 
@@ -68,43 +54,28 @@ export default function EditTaskPage() {
     try {
       const result = await updateTaskTasksTaskIdPatch({
         path: { task_id: task.id },
-        body: {
-          status: "pending",
-          requirements: data.requirements,
-          dev_agent_type: data.dev_agent_type as "spec_driven_development",
-          test_agent_type: data.test_agent_type as "generic_testing",
-          project_id: data.project_id ?? null,
-        },
+        body: { status: "pending", requirements: data.requirements },
       });
-
       if (result.data) {
         router.push("/tasks");
       } else {
         setError("Failed to resubmit task. Please try again.");
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return <p className="text-muted-foreground">Loading task...</p>;
-  }
-
-  if (!task) {
-    return null;
-  }
+  if (isLoading) return <p className="text-muted-foreground">Loading task...</p>;
+  if (!task) return null;
 
   const initialValues: TaskFormValues = {
-    project_type:
-      task.project.name === null ? "new" : "existing",
-    project_id: task.project.name !== null ? task.project.id : undefined,
-    dev_agent_type: task.dev_agent_type,
-    test_agent_type: task.test_agent_type,
+    project_type: task.project.source_type === "existing" ? "existing" : "new",
+    project_name: task.project.name ?? "",
+    agent_id: task.agent?.id ?? "",
+    git_url: task.project.git_url ?? "",
     requirements: task.requirements,
   };
 
@@ -117,7 +88,7 @@ export default function EditTaskPage() {
         </div>
       )}
       <TaskForm
-        projects={projects}
+        agents={agents}
         onSubmit={handleSubmit}
         initialValues={initialValues}
         isSubmitting={isSubmitting}

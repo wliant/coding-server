@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Multi-Agent Software Development System API",
-    "version": "0.2.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/health": {
@@ -16,6 +16,30 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "summary": "List Agents",
+        "operationId": "listAgents",
+        "tags": ["agents"],
+        "description": "Returns all active agents from the agent registry, ordered by display_name.",
+        "responses": {
+          "200": {
+            "description": "List of active agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Agents"
                 }
               }
             }
@@ -200,6 +224,7 @@
         "summary": "Push Task To Remote",
         "operationId": "pushTaskToRemote",
         "tags": ["tasks"],
+        "description": "Pushes the task's work directory to a remote git repository. If git_url is provided in the body, it is saved to the project record before the push.",
         "parameters": [
           {
             "name": "task_id",
@@ -212,6 +237,24 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PushTaskRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Push succeeded",
@@ -325,6 +368,75 @@
   },
   "components": {
     "schemas": {
+      "AgentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier",
+            "description": "Machine-readable key; maps to the agent library"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Human-readable name shown in the UI"
+          }
+        },
+        "type": "object",
+        "required": ["id", "identifier", "display_name"],
+        "title": "AgentSummary"
+      },
+      "AgentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": ["id", "identifier", "display_name", "is_active", "created_at"],
+        "title": "AgentResponse"
+      },
+      "PushTaskRequest": {
+        "properties": {
+          "git_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Url",
+            "description": "Git repository URL to save to the project and push to. If provided, saved to project before push."
+          }
+        },
+        "type": "object",
+        "title": "PushTaskRequest"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -364,10 +476,35 @@
           "source_type": {
             "type": "string",
             "title": "Source Type"
+          },
+          "git_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Url",
+            "description": "Remote git repository URL"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Used to disambiguate projects with the same name"
           }
         },
         "type": "object",
-        "required": ["id", "name", "source_type"],
+        "required": ["id", "source_type"],
         "title": "ProjectSummary"
       },
       "ProjectSummaryWithGitUrl": {
@@ -403,6 +540,18 @@
             ],
             "title": "Git Url",
             "description": "Remote git repository URL; used as push target"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -417,12 +566,14 @@
       "DevAgentType": {
         "type": "string",
         "enum": ["spec_driven_development"],
-        "title": "DevAgentType"
+        "title": "DevAgentType",
+        "deprecated": true
       },
       "TestAgentType": {
         "type": "string",
         "enum": ["generic_testing"],
-        "title": "TestAgentType"
+        "title": "TestAgentType",
+        "deprecated": true
       },
       "ProjectType": {
         "type": "string",
@@ -439,11 +590,17 @@
           "project": {
             "$ref": "#/components/schemas/ProjectSummary"
           },
-          "dev_agent_type": {
-            "$ref": "#/components/schemas/DevAgentType"
-          },
-          "test_agent_type": {
-            "$ref": "#/components/schemas/TestAgentType"
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent",
+            "description": "Null for legacy tasks that predate the agent registry"
           },
           "requirements": {
             "type": "string",
@@ -472,14 +629,36 @@
               }
             ],
             "title": "Error Message"
+          },
+          "dev_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DevAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Deprecated: legacy field. Use agent instead."
+          },
+          "test_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Deprecated: legacy field. Use agent instead."
           }
         },
         "type": "object",
         "required": [
           "id",
           "project",
-          "dev_agent_type",
-          "test_agent_type",
           "requirements",
           "status",
           "created_at",
@@ -497,11 +676,17 @@
           "project": {
             "$ref": "#/components/schemas/ProjectSummaryWithGitUrl"
           },
-          "dev_agent_type": {
-            "$ref": "#/components/schemas/DevAgentType"
-          },
-          "test_agent_type": {
-            "$ref": "#/components/schemas/TestAgentType"
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent",
+            "description": "Null for legacy tasks that predate the agent registry"
           },
           "requirements": {
             "type": "string",
@@ -578,14 +763,36 @@
             ],
             "title": "Elapsed Seconds",
             "description": "Seconds elapsed since started_at; non-null only when status is in_progress"
+          },
+          "dev_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DevAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Deprecated: legacy field. Use agent instead."
+          },
+          "test_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Deprecated: legacy field. Use agent instead."
           }
         },
         "type": "object",
         "required": [
           "id",
           "project",
-          "dev_agent_type",
-          "test_agent_type",
           "requirements",
           "status",
           "created_at",
@@ -633,28 +840,24 @@
           "project_type": {
             "$ref": "#/components/schemas/ProjectType"
           },
-          "project_id": {
+          "project_name": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Project Id"
+            "title": "Project Name",
+            "description": "Required when project_type is \"new\". Not required to be unique."
           },
-          "dev_agent_type": {
-            "$ref": "#/components/schemas/DevAgentType"
-          },
-          "test_agent_type": {
-            "$ref": "#/components/schemas/TestAgentType"
-          },
-          "requirements": {
+          "agent_id": {
             "type": "string",
-            "minLength": 1,
-            "title": "Requirements"
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "ID of the agent from the agent registry. Determines which agent library executes the task."
           },
           "git_url": {
             "anyOf": [
@@ -666,14 +869,46 @@
               }
             ],
             "title": "Git Url",
-            "description": "Remote git repository URL; stored on the new Project when project_type is \"new\""
+            "description": "Remote git repository URL. Required when project_type is 'existing'. Optional for new projects."
+          },
+          "requirements": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Requirements"
+          },
+          "dev_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DevAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Agent Type",
+            "deprecated": true,
+            "description": "Deprecated: use agent_id instead. Retained for backward compatibility.",
+            "default": "spec_driven_development"
+          },
+          "test_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Agent Type",
+            "deprecated": true,
+            "description": "Deprecated: use agent_id instead. Retained for backward compatibility.",
+            "default": "generic_testing"
           }
         },
         "type": "object",
         "required": [
           "project_type",
-          "dev_agent_type",
-          "test_agent_type",
+          "agent_id",
           "requirements"
         ],
         "title": "CreateTaskRequest"
@@ -703,28 +938,6 @@
             ],
             "title": "Project Id"
           },
-          "dev_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DevAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dev Agent Type"
-          },
-          "test_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TestAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Test Agent Type"
-          },
           "requirements": {
             "anyOf": [
               {
@@ -736,6 +949,30 @@
               }
             ],
             "title": "Requirements"
+          },
+          "dev_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DevAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Agent Type",
+            "deprecated": true
+          },
+          "test_agent_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestAgentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Agent Type",
+            "deprecated": true
           }
         },
         "type": "object",

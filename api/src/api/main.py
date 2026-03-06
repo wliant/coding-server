@@ -13,6 +13,7 @@ from pythonjsonlogger import jsonlogger
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from api.db import engine
+from api.routes.agents import router as agents_router
 from api.routes.health import router as health_router
 from api.routes.projects import router as projects_router
 from api.routes.settings import router as settings_router
@@ -101,6 +102,7 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
 
 
 app.include_router(health_router)
+app.include_router(agents_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
 app.include_router(settings_router)

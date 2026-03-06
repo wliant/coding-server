@@ -140,7 +140,7 @@ export default function TaskDetailPage() {
 
         {task.status === "completed" && (
           <div className="pt-2 border-t">
-            <PushToRemoteButton taskId={task.id} />
+            <PushToRemoteButton taskId={task.id} projectGitUrl={task.project.git_url} />
           </div>
         )}
       </div>
