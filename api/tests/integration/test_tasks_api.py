@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from api.models.project import Base, Project
 from api.models.job import Job, WorkDirectory  # noqa: F401
 from api.models.setting import Setting  # noqa: F401
+from api.models.agent import Agent  # noqa: F401
 
 
 @pytest.fixture
@@ -50,6 +51,20 @@ async def client(test_session):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+async def seeded_agent(test_session) -> Agent:
+    """Seed one active agent and return it."""
+    agent = Agent(
+        identifier="spec_driven_development",
+        display_name="Spec-Driven Development",
+        is_active=True,
+    )
+    test_session.add(agent)
+    await test_session.commit()
+    await test_session.refresh(agent)
+    return agent
+
+
 # ============================================================
 # GET /projects tests
 # ============================================================
@@ -84,12 +99,12 @@ async def test_get_projects_empty_when_no_named_projects(client, test_session):
 # POST /tasks tests
 # ============================================================
 
-async def test_post_task_new_project_returns_201_with_pending_status(client):
+async def test_post_task_new_project_returns_201_with_pending_status(client, seeded_agent):
     """POST /tasks with project_type='new' returns 201 with status='pending'."""
     payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Test Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Build a REST API for user management",
     }
 
@@ -104,24 +119,24 @@ async def test_post_task_new_project_returns_201_with_pending_status(client):
     uuid.UUID(data["id"])
 
 
-async def test_post_task_missing_requirements_returns_422(client):
+async def test_post_task_missing_requirements_returns_422(client, seeded_agent):
     """POST /tasks without requirements returns 422."""
     payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Test Project",
+        "agent_id": str(seeded_agent.id),
     }
 
     response = await client.post("/tasks", json=payload)
     assert response.status_code == 422
 
 
-async def test_post_task_empty_requirements_returns_422(client):
+async def test_post_task_empty_requirements_returns_422(client, seeded_agent):
     """POST /tasks with empty requirements returns 422."""
     payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Test Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "",
     }
 
@@ -129,33 +144,24 @@ async def test_post_task_empty_requirements_returns_422(client):
     assert response.status_code == 422
 
 
-async def test_post_task_existing_invalid_project_id_returns_422(client):
-    """POST /tasks with project_type='existing' and non-existent project_id returns 422."""
+async def test_post_task_existing_missing_git_url_returns_422(client, seeded_agent):
+    """POST /tasks with project_type='existing' and no git_url returns 422."""
     payload = {
         "project_type": "existing",
-        "project_id": str(uuid.uuid4()),
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
-        "requirements": "Do something with the project",
+        "agent_id": str(seeded_agent.id),
+        "requirements": "Do something",
     }
 
     response = await client.post("/tasks", json=payload)
     assert response.status_code == 422
 
 
-async def test_post_task_existing_project_creates_task(client, test_session):
-    """POST /tasks with project_type='existing' and valid project_id returns 201."""
-    # Create a project first
-    project = Project(name="My Project", source_type="existing", status="active")
-    test_session.add(project)
-    await test_session.commit()
-    await test_session.refresh(project)
-
+async def test_post_task_existing_project_creates_task(client, seeded_agent):
+    """POST /tasks with project_type='existing' and git_url returns 201."""
     payload = {
         "project_type": "existing",
-        "project_id": str(project.id),
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "agent_id": str(seeded_agent.id),
+        "git_url": "https://github.com/org/my-project.git",
         "requirements": "Add login functionality",
     }
 
@@ -163,7 +169,8 @@ async def test_post_task_existing_project_creates_task(client, test_session):
     assert response.status_code == 201
     data = response.json()
     assert data["status"] == "pending"
-    assert data["project"]["id"] == str(project.id)
+    assert data["project"]["source_type"] == "existing"
+    assert data["project"]["git_url"] == "https://github.com/org/my-project.git"
 
 
 # ============================================================
@@ -177,19 +184,19 @@ async def test_get_tasks_returns_empty_when_no_tasks(client):
     assert response.json() == []
 
 
-async def test_get_tasks_returns_all_tasks_ordered_by_created_at_desc(client):
+async def test_get_tasks_returns_all_tasks_ordered_by_created_at_desc(client, seeded_agent):
     """GET /tasks returns all tasks ordered by created_at DESC."""
     # Create two tasks
     payload1 = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Project One",
+        "agent_id": str(seeded_agent.id),
         "requirements": "First task",
     }
     payload2 = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Project Two",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Second task",
     }
 
@@ -207,12 +214,12 @@ async def test_get_tasks_returns_all_tasks_ordered_by_created_at_desc(client):
     assert data[1]["requirements"] == "First task"
 
 
-async def test_get_tasks_includes_project_object(client):
+async def test_get_tasks_includes_project_object(client, seeded_agent):
     """GET /tasks response includes project object with name and source_type."""
     payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "My Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Build something",
     }
 
@@ -231,13 +238,13 @@ async def test_get_tasks_includes_project_object(client):
 # PATCH /tasks/{id} abort tests
 # ============================================================
 
-async def test_patch_task_abort_pending_returns_200_aborted(client):
+async def test_patch_task_abort_pending_returns_200_aborted(client, seeded_agent):
     """PATCH /tasks/{id} with status='aborted' on pending task returns 200 with status='aborted'."""
     # Create a task first
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Task to abort",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Task to abort",
     }
     create_response = await client.post("/tasks", json=create_payload)
@@ -282,13 +289,13 @@ async def test_patch_task_abort_non_existent_returns_404(client):
 # PATCH /tasks/{id} resubmit tests
 # ============================================================
 
-async def test_patch_task_resubmit_aborted_returns_200_pending(client):
+async def test_patch_task_resubmit_aborted_returns_200_pending(client, seeded_agent):
     """PATCH /tasks/{id} resubmit on aborted task returns 200 with updated fields and status='pending'."""
     # Create a task
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Resubmit Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Original requirement",
     }
     create_response = await client.post("/tasks", json=create_payload)
@@ -310,13 +317,13 @@ async def test_patch_task_resubmit_aborted_returns_200_pending(client):
     assert data["requirements"] == "Updated requirement"
 
 
-async def test_patch_task_resubmit_non_aborted_returns_422(client):
+async def test_patch_task_resubmit_non_aborted_returns_422(client, seeded_agent):
     """PATCH /tasks/{id} resubmit on non-aborted task returns 422."""
     # Create a pending task
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Some Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Some task",
     }
     create_response = await client.post("/tasks", json=create_payload)
@@ -344,12 +351,12 @@ async def test_patch_task_resubmit_non_existent_returns_404(client):
 # ============================================================
 
 
-async def test_get_task_detail_returns_200_with_task_detail_shape(client):
+async def test_get_task_detail_returns_200_with_task_detail_shape(client, seeded_agent):
     """GET /tasks/{id} returns 200 with TaskDetailResponse shape."""
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Detail Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Build a detail endpoint",
     }
     create_response = await client.post("/tasks", json=create_payload)
@@ -408,12 +415,12 @@ async def test_get_task_detail_includes_elapsed_seconds_for_in_progress(client, 
     assert data["elapsed_seconds"] >= 30
 
 
-async def test_get_task_detail_work_directory_path_is_null_before_worker_claims(client):
+async def test_get_task_detail_work_directory_path_is_null_before_worker_claims(client, seeded_agent):
     """GET /tasks/{id} has work_directory_path=null for a pending task."""
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Pending Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Pending task",
     }
     response = await client.post("/tasks", json=create_payload)
@@ -429,12 +436,12 @@ async def test_get_task_detail_work_directory_path_is_null_before_worker_claims(
 # ============================================================
 
 
-async def test_push_returns_409_when_task_not_completed(client):
+async def test_push_returns_409_when_task_not_completed(client, seeded_agent):
     """POST /tasks/{id}/push returns 409 when task is not Completed."""
     create_payload = {
         "project_type": "new",
-        "dev_agent_type": "spec_driven_development",
-        "test_agent_type": "generic_testing",
+        "project_name": "Push Test Project",
+        "agent_id": str(seeded_agent.id),
         "requirements": "Pending task",
     }
     response = await client.post("/tasks", json=create_payload)

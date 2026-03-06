@@ -41,6 +41,9 @@ class Job(Base):
     )
     lease_holder: Mapped[str | None] = mapped_column(String(36), nullable=True)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True
+    )
 
 
 class WorkDirectory(Base):

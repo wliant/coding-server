@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.models.agent import Agent
 from api.models.job import Job, WorkDirectory
 from api.models.project import Project
 from api.schemas.task import CreateTaskRequest, PushResponse, UpdateTaskRequest
@@ -14,23 +15,17 @@ from api.services.project_service import create_project
 
 async def create_task(
     db: AsyncSession, req: CreateTaskRequest
-) -> tuple[Job, Project]:
+) -> tuple[Job, Project, Agent | None]:
     """Create a task (Job) and optionally a new Project.
 
-    Returns (job, project) tuple.
+    Returns (job, project, agent | None) tuple.
     """
-    if req.project_type.value == "new":
-        project = await create_project(db, source_type="new")
-        if req.git_url is not None:
-            project.git_url = req.git_url
-    else:
-        # existing project — validate it exists
-        result = await db.execute(
-            select(Project).where(Project.id == req.project_id)
-        )
-        project = result.scalar_one_or_none()
-        if project is None:
-            raise HTTPException(status_code=422, detail="Project not found")
+    source_type = req.project_type.value  # "new" or "existing"
+    project = await create_project(db, source_type=source_type)
+    if req.project_name:
+        project.name = req.project_name
+    if req.git_url is not None:
+        project.git_url = req.git_url
 
     now = datetime.now(timezone.utc)
     job = Job(
@@ -38,6 +33,7 @@ async def create_task(
         requirement=req.requirements,
         dev_agent_type=req.dev_agent_type.value,
         test_agent_type=req.test_agent_type.value,
+        agent_id=req.agent_id,
         status="pending",
         updated_at=now,
     )
@@ -46,14 +42,25 @@ async def create_task(
     await db.refresh(job)
     await db.commit()
 
-    return job, project
+    # Load the agent for the response
+    agent = await _load_agent(db, req.agent_id)
+
+    return job, project, agent
 
 
-async def list_tasks(db: AsyncSession) -> list[tuple[Job, Project]]:
-    """Return all jobs joined with their projects, ordered by created_at DESC."""
+async def _load_agent(db: AsyncSession, agent_id: uuid.UUID | None) -> Agent | None:
+    if agent_id is None:
+        return None
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    return result.scalar_one_or_none()
+
+
+async def list_tasks(db: AsyncSession) -> list[tuple[Job, Project, Agent | None]]:
+    """Return all jobs joined with their projects and agents, ordered by created_at DESC."""
     result = await db.execute(
-        select(Job, Project)
+        select(Job, Project, Agent)
         .join(Project, Job.project_id == Project.id)
+        .outerjoin(Agent, Job.agent_id == Agent.id)
         .order_by(Job.created_at.desc())
     )
     return list(result.all())
@@ -61,46 +68,51 @@ async def list_tasks(db: AsyncSession) -> list[tuple[Job, Project]]:
 
 async def get_task_detail(
     db: AsyncSession, task_id: uuid.UUID
-) -> tuple[Job, Project, WorkDirectory | None] | None:
-    """Return (job, project, work_directory | None) for the given task_id.
+) -> tuple[Job, Project, WorkDirectory | None, Agent | None] | None:
+    """Return (job, project, work_directory | None, agent | None) for the given task_id.
 
     Returns None if the task does not exist.
     """
     result = await db.execute(
-        select(Job, Project)
+        select(Job, Project, Agent)
         .join(Project, Job.project_id == Project.id)
+        .outerjoin(Agent, Job.agent_id == Agent.id)
         .where(Job.id == task_id)
     )
     row = result.one_or_none()
     if row is None:
         return None
 
-    job, project = row
+    job, project, agent = row
 
     wd_result = await db.execute(
         select(WorkDirectory).where(WorkDirectory.job_id == task_id)
     )
     work_directory = wd_result.scalar_one_or_none()
 
-    return job, project, work_directory
+    return job, project, work_directory, agent
 
 
 async def trigger_push(
-    db: AsyncSession, task_id: uuid.UUID
+    db: AsyncSession,
+    task_id: uuid.UUID,
+    git_url_override: str | None = None,
 ) -> PushResponse:
     """Push a completed task's working directory to the remote git repository.
+
+    If git_url_override is provided, it is saved to the project before pushing.
 
     Raises:
         HTTPException 404: task not found
         HTTPException 409: task is not Completed
-        HTTPException 422: project has no git_url
+        HTTPException 422: project has no git_url (and none provided)
         HTTPException 502: git push failed
     """
     detail = await get_task_detail(db, task_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    job, project, work_directory = detail
+    job, project, work_directory, _agent = detail
 
     if job.status != "completed":
         raise HTTPException(
@@ -108,7 +120,13 @@ async def trigger_push(
             detail=f"Task is not completed (current status: {job.status})",
         )
 
-    if project.git_url is None:
+    # Save git_url to project if an override is provided
+    if git_url_override is not None:
+        project.git_url = git_url_override
+        await db.flush()
+
+    effective_git_url = project.git_url
+    if effective_git_url is None:
         raise HTTPException(
             status_code=422, detail="Project has no git_url configured"
         )
@@ -121,29 +139,32 @@ async def trigger_push(
     branch_name = f"task/{str(task_id)[:8]}"
 
     try:
-        return git_service.push_working_directory_to_remote(
+        result = git_service.push_working_directory_to_remote(
             work_dir_path=work_directory.path,
-            remote_url=project.git_url,
+            remote_url=effective_git_url,
             branch_name=branch_name,
         )
+        await db.commit()
+        return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Git push failed: {exc}") from exc
 
 
 async def abort_task(
     db: AsyncSession, task_id: uuid.UUID
-) -> tuple[Job, Project]:
+) -> tuple[Job, Project, Agent | None]:
     """Abort a pending task. Raises 404 if not found, 422 if not pending."""
     result = await db.execute(
-        select(Job, Project)
+        select(Job, Project, Agent)
         .join(Project, Job.project_id == Project.id)
+        .outerjoin(Agent, Job.agent_id == Agent.id)
         .where(Job.id == task_id)
     )
     row = result.one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    job, project = row
+    job, project, agent = row
     if job.status != "pending":
         raise HTTPException(
             status_code=422, detail="Can only abort pending tasks"
@@ -153,23 +174,24 @@ async def abort_task(
     job.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(job)
-    return job, project
+    return job, project, agent
 
 
 async def resubmit_task(
     db: AsyncSession, task_id: uuid.UUID, updates: UpdateTaskRequest
-) -> tuple[Job, Project]:
+) -> tuple[Job, Project, Agent | None]:
     """Resubmit an aborted task. Raises 404 if not found, 422 if not aborted."""
     result = await db.execute(
-        select(Job, Project)
+        select(Job, Project, Agent)
         .join(Project, Job.project_id == Project.id)
+        .outerjoin(Agent, Job.agent_id == Agent.id)
         .where(Job.id == task_id)
     )
     row = result.one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    job, project = row
+    job, project, agent = row
     if job.status != "aborted":
         raise HTTPException(
             status_code=422, detail="Can only resubmit aborted tasks"
@@ -178,10 +200,6 @@ async def resubmit_task(
     # Apply updates
     if updates.requirements is not None:
         job.requirement = updates.requirements
-    if updates.dev_agent_type is not None:
-        job.dev_agent_type = updates.dev_agent_type.value
-    if updates.test_agent_type is not None:
-        job.test_agent_type = updates.test_agent_type.value
     if updates.project_id is not None:
         # Validate project exists
         proj_result = await db.execute(
@@ -197,4 +215,4 @@ async def resubmit_task(
     job.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(job)
-    return job, project
+    return job, project, agent

@@ -17,6 +17,7 @@ async def db_session():
     from api.models.project import Base
     from api.models.job import Job, WorkDirectory  # noqa: F401
     from api.models.setting import Setting  # noqa: F401
+    from api.models.agent import Agent  # noqa: F401
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:

@@ -3,24 +3,21 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskForm, type TaskFormValues } from "@/components/tasks/TaskForm";
-import { listProjectsProjectsGet, createTaskTasksPost } from "@/client/sdk.gen";
-import type { ProjectSummary } from "@/client/types.gen";
+import { listAgents, createTaskTasksPost } from "@/client/sdk.gen";
+import type { AgentResponse } from "@/client/types.gen";
 import { client } from "@/client/client.gen";
 
-// Configure the client base URL
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
 
 export default function NewTaskPage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [agents, setAgents] = useState<AgentResponse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listProjectsProjectsGet().then((result) => {
-      if (result.data) {
-        setProjects(result.data);
-      }
+    listAgents().then((result) => {
+      if (result.data) setAgents(result.data);
     });
   }, []);
 
@@ -31,9 +28,9 @@ export default function NewTaskPage() {
       const result = await createTaskTasksPost({
         body: {
           project_type: data.project_type,
-          project_id: data.project_id ?? null,
-          dev_agent_type: data.dev_agent_type as "spec_driven_development",
-          test_agent_type: data.test_agent_type as "generic_testing",
+          project_name: data.project_name ?? null,
+          agent_id: data.agent_id,
+          git_url: data.git_url ?? null,
           requirements: data.requirements,
         },
       });
@@ -67,11 +64,7 @@ export default function NewTaskPage() {
           {error}
         </div>
       )}
-      <TaskForm
-        projects={projects}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
-      />
+      <TaskForm agents={agents} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
     </div>
   );
 }

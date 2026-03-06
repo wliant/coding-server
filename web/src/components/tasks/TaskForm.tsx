@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -10,18 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProjectSummary } from "@/client/types.gen";
+import type { AgentResponse } from "@/client/types.gen";
 
 export interface TaskFormValues {
   project_type: "new" | "existing";
-  project_id?: string;
-  dev_agent_type: string;
-  test_agent_type: string;
+  project_name?: string;
+  agent_id: string;
+  git_url?: string;
   requirements: string;
 }
 
 interface TaskFormProps {
-  projects: ProjectSummary[];
+  agents: AgentResponse[];
   onSubmit: (data: TaskFormValues) => Promise<void>;
   initialValues?: Partial<TaskFormValues>;
   isSubmitting?: boolean;
@@ -29,137 +30,137 @@ interface TaskFormProps {
 
 const DEFAULT_VALUES: TaskFormValues = {
   project_type: "new",
-  project_id: undefined,
-  dev_agent_type: "spec_driven_development",
-  test_agent_type: "generic_testing",
+  project_name: "",
+  agent_id: "",
+  git_url: "",
   requirements: "",
 };
 
 export function TaskForm({
-  projects,
+  agents,
   onSubmit,
   initialValues,
   isSubmitting = false,
 }: TaskFormProps) {
   const merged = { ...DEFAULT_VALUES, ...initialValues };
 
-  // "project_select" is either "new" or a project UUID
-  const getInitialProjectSelect = () => {
-    if (merged.project_type === "existing" && merged.project_id) {
-      return merged.project_id;
-    }
-    return "new";
-  };
-
-  const [projectSelect, setProjectSelect] = useState<string>(
-    getInitialProjectSelect()
+  const [projectType, setProjectType] = useState<"new" | "existing">(
+    merged.project_type
   );
-  const [devAgentType, setDevAgentType] = useState<string>(
-    merged.dev_agent_type
+  const [projectName, setProjectName] = useState<string>(
+    merged.project_name ?? ""
   );
-  const [testAgentType, setTestAgentType] = useState<string>(
-    merged.test_agent_type
-  );
+  const [agentId, setAgentId] = useState<string>(merged.agent_id ?? "");
+  const [gitUrl, setGitUrl] = useState<string>(merged.git_url ?? "");
   const [requirements, setRequirements] = useState<string>(
     merged.requirements
   );
 
-  const isProjectSelected = projectSelect !== "";
+  const isExisting = projectType === "existing";
+
+  const isProjectNameValid = !isExisting ? projectName.trim().length > 0 : true;
+  const isGitUrlValid = isExisting ? gitUrl.trim().length > 0 : true;
+  const isAgentSelected = agentId.trim().length > 0;
   const isRequirementsValid = requirements.trim().length > 0;
-  const isFormValid = isProjectSelected && isRequirementsValid;
+  const isFormValid =
+    isProjectNameValid && isGitUrlValid && isAgentSelected && isRequirementsValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid || isSubmitting) return;
 
-    const data: TaskFormValues =
-      projectSelect === "new"
-        ? {
-            project_type: "new",
-            project_id: undefined,
-            dev_agent_type: devAgentType,
-            test_agent_type: testAgentType,
-            requirements,
-          }
-        : {
-            project_type: "existing",
-            project_id: projectSelect,
-            dev_agent_type: devAgentType,
-            test_agent_type: testAgentType,
-            requirements,
-          };
+    const data: TaskFormValues = {
+      project_type: projectType,
+      project_name: isExisting ? undefined : projectName.trim(),
+      agent_id: agentId,
+      git_url: gitUrl.trim() || undefined,
+      requirements,
+    };
 
     await onSubmit(data);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-      {/* Project Selection */}
+      {/* Project Type */}
       <div className="space-y-2">
         <label
-          htmlFor="project-select"
+          htmlFor="project-type-select"
           className="block text-sm font-medium text-foreground"
         >
           Project
         </label>
         <Select
-          value={projectSelect}
-          onValueChange={setProjectSelect}
+          value={projectType}
+          onValueChange={(v) => {
+            setProjectType(v as "new" | "existing");
+            setGitUrl("");
+          }}
         >
-          <SelectTrigger id="project-select" aria-label="Project">
-            <SelectValue placeholder="Select a project" />
+          <SelectTrigger id="project-type-select" aria-label="Project type">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="new">New Project</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name ?? "Unnamed Project"}
+            <SelectItem value="existing">Existing Project</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Project Name — only for new projects */}
+      {!isExisting && (
+        <div className="space-y-2">
+          <label
+            htmlFor="project-name-input"
+            className="block text-sm font-medium text-foreground"
+          >
+            Project Name <span className="text-red-500">*</span>
+          </label>
+          <Input
+            id="project-name-input"
+            aria-label="Project Name"
+            placeholder="e.g. My App"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Git URL */}
+      <div className="space-y-2">
+        <label
+          htmlFor="git-url-input"
+          className="block text-sm font-medium text-foreground"
+        >
+          Git URL{isExisting && <span className="text-red-500"> *</span>}
+        </label>
+        <Input
+          id="git-url-input"
+          aria-label="Git URL"
+          placeholder="https://github.com/org/repo.git"
+          value={gitUrl}
+          onChange={(e) => setGitUrl(e.target.value)}
+        />
+      </div>
+
+      {/* Agent */}
+      <div className="space-y-2">
+        <label
+          htmlFor="agent-select"
+          className="block text-sm font-medium text-foreground"
+        >
+          Agent <span className="text-red-500">*</span>
+        </label>
+        <Select value={agentId} onValueChange={setAgentId}>
+          <SelectTrigger id="agent-select" aria-label="Agent">
+            <SelectValue placeholder="Select an agent" />
+          </SelectTrigger>
+          <SelectContent>
+            {agents.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.display_name}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Dev Agent Type */}
-      <div className="space-y-2">
-        <label
-          htmlFor="dev-agent-select"
-          className="block text-sm font-medium text-foreground"
-        >
-          Dev Agent
-        </label>
-        <Select
-          value={devAgentType}
-          onValueChange={setDevAgentType}
-        >
-          <SelectTrigger id="dev-agent-select" aria-label="Dev Agent">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="spec_driven_development">
-              Spec Driven Development Agent
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Test Agent Type */}
-      <div className="space-y-2">
-        <label
-          htmlFor="test-agent-select"
-          className="block text-sm font-medium text-foreground"
-        >
-          Test Agent
-        </label>
-        <Select
-          value={testAgentType}
-          onValueChange={setTestAgentType}
-        >
-          <SelectTrigger id="test-agent-select" aria-label="Test Agent">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="generic_testing">Generic Testing Agent</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -170,7 +171,7 @@ export function TaskForm({
           htmlFor="requirements-textarea"
           className="block text-sm font-medium text-foreground"
         >
-          Requirements
+          Requirements <span className="text-red-500">*</span>
         </label>
         <Textarea
           id="requirements-textarea"
@@ -183,10 +184,7 @@ export function TaskForm({
       </div>
 
       {/* Submit */}
-      <Button
-        type="submit"
-        disabled={!isFormValid || isSubmitting}
-      >
+      <Button type="submit" disabled={!isFormValid || isSubmitting}>
         {isSubmitting ? "Submitting..." : "Submit Task"}
       </Button>
     </form>
