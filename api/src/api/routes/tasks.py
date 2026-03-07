@@ -12,7 +12,6 @@ from api.models.project import Project
 from api.schemas.agent import AgentSummary
 from api.schemas.task import (
     CreateTaskRequest,
-    DevAgentType,
     ProjectSummary,
     ProjectSummaryWithGitUrl,
     PushResponse,
@@ -20,7 +19,6 @@ from api.schemas.task import (
     TaskDetailResponse,
     TaskResponse,
     TaskStatus,
-    TestAgentType,
     UpdateTaskRequest,
 )
 from api.services import task_service
@@ -46,8 +44,6 @@ def _task_to_response(job: Job, project: Project, agent: Agent | None) -> TaskRe
         created_at=created_at,
         updated_at=updated_at,
         error_message=job.error_message,
-        dev_agent_type=DevAgentType(job.dev_agent_type) if job.dev_agent_type else None,
-        test_agent_type=TestAgentType(job.test_agent_type) if job.test_agent_type else None,
     )
 
 
@@ -80,8 +76,6 @@ def _task_to_detail_response(
         error_message=job.error_message,
         work_directory_path=work_directory.path if work_directory else None,
         elapsed_seconds=elapsed_seconds,
-        dev_agent_type=DevAgentType(job.dev_agent_type) if job.dev_agent_type else None,
-        test_agent_type=TestAgentType(job.test_agent_type) if job.test_agent_type else None,
     )
 
 

@@ -8,8 +8,6 @@ const mockTasks: TaskResponse[] = [
   {
     id: "task-1",
     project: { id: "proj-1", name: "Project Alpha", source_type: "new" },
-    dev_agent_type: "spec_driven_development",
-    test_agent_type: "generic_testing",
     requirements: "Build a REST API",
     status: "pending",
     created_at: "2026-03-01T10:00:00Z",
@@ -19,8 +17,6 @@ const mockTasks: TaskResponse[] = [
   {
     id: "task-2",
     project: { id: "proj-2", name: "Project Beta", source_type: "existing" },
-    dev_agent_type: "spec_driven_development",
-    test_agent_type: "generic_testing",
     requirements: "Add authentication",
     status: "aborted",
     created_at: "2026-03-01T09:00:00Z",
@@ -30,8 +26,6 @@ const mockTasks: TaskResponse[] = [
   {
     id: "task-3",
     project: { id: "proj-3", name: null, source_type: "new" },
-    dev_agent_type: "spec_driven_development",
-    test_agent_type: "generic_testing",
     requirements: "Setup CI/CD pipeline",
     status: "completed",
     created_at: "2026-03-01T08:00:00Z",
@@ -45,8 +39,7 @@ describe("TaskTable", () => {
     render(<TaskTable tasks={mockTasks} />);
 
     expect(screen.getByText(/project/i)).toBeInTheDocument();
-    expect(screen.getByText(/dev agent/i)).toBeInTheDocument();
-    expect(screen.getByText(/test agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent/i)).toBeInTheDocument();
     expect(screen.getByText(/status/i)).toBeInTheDocument();
     expect(screen.getByText(/submitted/i)).toBeInTheDocument();
   });

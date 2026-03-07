@@ -15,14 +15,6 @@ class TaskStatus(str, Enum):
     failed = "failed"
 
 
-class DevAgentType(str, Enum):
-    spec_driven_development = "spec_driven_development"
-
-
-class TestAgentType(str, Enum):
-    generic_testing = "generic_testing"
-
-
 class ProjectType(str, Enum):
     new = "new"
     existing = "existing"
@@ -57,16 +49,6 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     error_message: str | None = None
-    dev_agent_type: DevAgentType | None = Field(
-        default=None,
-        deprecated=True,
-        description="Deprecated: legacy field. Use agent instead.",
-    )
-    test_agent_type: TestAgentType | None = Field(
-        default=None,
-        deprecated=True,
-        description="Deprecated: legacy field. Use agent instead.",
-    )
 
     model_config = {"from_attributes": True}
 
@@ -85,16 +67,6 @@ class TaskDetailResponse(BaseModel):
     work_directory_path: str | None = None
     elapsed_seconds: int | None = None
     branch: str | None = None
-    dev_agent_type: DevAgentType | None = Field(
-        default=None,
-        deprecated=True,
-        description="Deprecated: legacy field. Use agent instead.",
-    )
-    test_agent_type: TestAgentType | None = Field(
-        default=None,
-        deprecated=True,
-        description="Deprecated: legacy field. Use agent instead.",
-    )
 
     model_config = {"from_attributes": True}
 
@@ -116,16 +88,6 @@ class CreateTaskRequest(BaseModel):
     git_url: str | None = None
     branch: str | None = None
     requirements: str = Field(..., min_length=1)
-    dev_agent_type: DevAgentType = Field(
-        default=DevAgentType.spec_driven_development,
-        deprecated=True,
-        description="Deprecated: use agent_id instead.",
-    )
-    test_agent_type: TestAgentType = Field(
-        default=TestAgentType.generic_testing,
-        deprecated=True,
-        description="Deprecated: use agent_id instead.",
-    )
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> "CreateTaskRequest":
@@ -142,11 +104,3 @@ class UpdateTaskRequest(BaseModel):
     status: TaskStatus | None = None
     project_id: uuid.UUID | None = None
     requirements: str | None = Field(default=None, min_length=1)
-    dev_agent_type: DevAgentType | None = Field(
-        default=None,
-        deprecated=True,
-    )
-    test_agent_type: TestAgentType | None = Field(
-        default=None,
-        deprecated=True,
-    )

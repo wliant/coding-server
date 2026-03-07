@@ -38,8 +38,6 @@ async def create_task(
     job = Job(
         project_id=project.id,
         requirement=req.requirements,
-        dev_agent_type=req.dev_agent_type.value,
-        test_agent_type=req.test_agent_type.value,
         agent_id=req.agent_id,
         branch=req.branch,
         status="pending",

@@ -61,8 +61,7 @@ async def test_push_with_git_url_body_saves_url_and_returns_200(client, test_ses
         project_id=project.id,
         requirement="Completed task",
         status="completed",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     test_session.add(job)
     await test_session.flush()
@@ -113,8 +112,7 @@ async def test_push_without_body_uses_stored_url(client, test_session):
         project_id=project.id,
         requirement="Completed task",
         status="completed",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     test_session.add(job)
     await test_session.flush()

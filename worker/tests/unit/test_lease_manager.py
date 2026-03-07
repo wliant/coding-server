@@ -25,8 +25,7 @@ async def _seed_job(db_session, status: str = "pending") -> Job:
         project_id=project.id,
         requirement="Build something",
         status=status,
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -118,8 +117,7 @@ async def test_reap_expired_leases_resets_expired_in_progress_to_pending(db_sess
         project_id=project.id,
         requirement="old task",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
         lease_holder=str(uuid.uuid4()),
         lease_expires_at=expired_time,
     )

@@ -8,10 +8,8 @@ from api.models.job import Job
 from api.models.project import Project
 from api.schemas.task import (
     CreateTaskRequest,
-    DevAgentType,
     ProjectType,
     TaskStatus,
-    TestAgentType,
     UpdateTaskRequest,
 )
 from api.services import task_service
@@ -25,8 +23,6 @@ async def test_create_task_new_project_creates_both_project_and_job(db_session):
         project_type=ProjectType.new,
         project_name="Test Project",
         agent_id=_AGENT_ID,
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Build a REST API",
     )
 
@@ -48,8 +44,6 @@ async def test_create_task_existing_project_creates_new_project_and_job(db_sessi
         project_type=ProjectType.existing,
         agent_id=_AGENT_ID,
         git_url="https://github.com/org/existing-repo.git",
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Add feature X",
     )
 
@@ -72,8 +66,6 @@ def test_create_task_existing_project_missing_git_url_raises_validation_error():
             project_type=ProjectType.existing,
             agent_id=_AGENT_ID,
             requirements="Do something",
-            dev_agent_type=DevAgentType.spec_driven_development,
-            test_agent_type=TestAgentType.generic_testing,
         )
 
     assert "git_url" in str(exc_info.value).lower()
@@ -89,8 +81,7 @@ async def test_abort_task_on_pending_succeeds(db_session):
         project_id=project.id,
         requirement="Some task",
         status="pending",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -111,8 +102,7 @@ async def test_abort_task_on_in_progress_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -134,8 +124,7 @@ async def test_abort_task_on_aborted_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="aborted",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -157,8 +146,7 @@ async def test_resubmit_task_on_aborted_returns_to_pending(db_session):
         project_id=project.id,
         requirement="Old requirement",
         status="aborted",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -187,8 +175,7 @@ async def test_resubmit_task_on_pending_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="pending",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -208,8 +195,6 @@ async def test_create_task_new_project_with_git_url_stores_git_url(db_session):
         project_type=ProjectType.new,
         project_name="Repo Project",
         agent_id=_AGENT_ID,
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Build a REST API",
         git_url="https://github.com/org/repo.git",
     )
@@ -225,8 +210,6 @@ async def test_create_task_new_project_without_git_url_leaves_git_url_null(db_se
         project_type=ProjectType.new,
         project_name="No Git Project",
         agent_id=_AGENT_ID,
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Build a REST API",
     )
 
@@ -247,8 +230,7 @@ async def test_get_task_detail_returns_job_project_and_no_work_directory(db_sess
         project_id=project.id,
         requirement="Some task",
         status="pending",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -277,8 +259,7 @@ async def test_get_task_detail_returns_work_directory_when_present(db_session):
         project_id=project.id,
         requirement="Some task",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.flush()
@@ -314,8 +295,7 @@ async def test_resubmit_task_on_completed_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="completed",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()
@@ -351,15 +331,13 @@ def test_inject_github_token_leaves_ssh_unchanged():
 
 async def test_create_task_stores_branch(db_session):
     """create_task persists branch field on the job."""
-    from api.schemas.task import CreateTaskRequest, DevAgentType, ProjectType, TestAgentType
+    from api.schemas.task import CreateTaskRequest, ProjectType
 
     req = CreateTaskRequest(
         project_type=ProjectType.existing,
         agent_id=_AGENT_ID,
         git_url="https://github.com/org/repo.git",
         branch="feature/my-feature",
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Add feature",
     )
 
@@ -370,14 +348,12 @@ async def test_create_task_stores_branch(db_session):
 
 async def test_create_task_branch_defaults_to_none(db_session):
     """create_task with no branch leaves job.branch as None."""
-    from api.schemas.task import CreateTaskRequest, DevAgentType, ProjectType, TestAgentType
+    from api.schemas.task import CreateTaskRequest, ProjectType
 
     req = CreateTaskRequest(
         project_type=ProjectType.new,
         project_name="No Branch Project",
         agent_id=_AGENT_ID,
-        dev_agent_type=DevAgentType.spec_driven_development,
-        test_agent_type=TestAgentType.generic_testing,
         requirements="Build something",
     )
 
