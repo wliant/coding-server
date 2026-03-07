@@ -38,10 +38,12 @@ describe("TaskTable", () => {
   it("renders column headers", () => {
     render(<TaskTable tasks={mockTasks} />);
 
-    expect(screen.getByText(/project/i)).toBeInTheDocument();
-    expect(screen.getByText(/agent/i)).toBeInTheDocument();
-    expect(screen.getByText(/status/i)).toBeInTheDocument();
-    expect(screen.getByText(/submitted/i)).toBeInTheDocument();
+    const headers = screen.getAllByRole("columnheader");
+    const headerTexts = headers.map((h) => h.textContent);
+    expect(headerTexts).toContain("Project");
+    expect(headerTexts).toContain("Agent");
+    expect(headerTexts).toContain("Status");
+    expect(headerTexts).toContain("Submitted");
   });
 
   it("renders all provided tasks as rows", () => {

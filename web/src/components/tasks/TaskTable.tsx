@@ -25,6 +25,15 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
 
+  const getProjectLabel = (project: TaskResponse["project"]) => {
+    if (project.name) return project.name;
+    if (project.git_url) {
+      const match = project.git_url.match(/\/([^/]+?)(?:\.git)?$/);
+      return match ? match[1] : project.git_url;
+    }
+    return "New Project";
+  };
+
   const filteredTasks = tasks.filter((task) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -67,15 +76,6 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
       setDialogOpen(false);
       setAbortingTaskId(null);
     }
-  };
-
-  const getProjectLabel = (project: TaskResponse["project"]) => {
-    if (project.name) return project.name;
-    if (project.git_url) {
-      const match = project.git_url.match(/\/([^/]+?)(?:\.git)?$/);
-      return match ? match[1] : project.git_url;
-    }
-    return "New Project";
   };
 
   const formatDate = (dateStr: string) => {
