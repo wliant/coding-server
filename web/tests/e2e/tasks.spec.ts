@@ -1,15 +1,27 @@
 import { test, expect } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 
 const API_URL = process.env.API_URL || "http://localhost:8000";
+
+/** Fetch the first active agent's ID from the registry. */
+async function getAgentId(request: APIRequestContext): Promise<string> {
+  const response = await request.get(`${API_URL}/agents`);
+  expect(response.status()).toBe(200);
+  const agents = await response.json();
+  expect(agents.length).toBeGreaterThan(0);
+  return agents[0].id;
+}
 
 test("POST /tasks creates a pending task and GET /tasks/{id} returns detail", async ({
   request,
 }) => {
-  // TODO: agent_id is now required by CreateTaskRequest.
-  // These e2e tests need to first call GET /agents to look up an agent_id at runtime.
+  const agentId = await getAgentId(request);
+
   const createResponse = await request.post(`${API_URL}/tasks`, {
     data: {
       project_type: "new",
+      project_name: "E2E Test Project",
+      agent_id: agentId,
       requirements: "E2E test: add a hello world function",
       git_url: "https://github.com/example/repo.git",
     },
@@ -48,10 +60,13 @@ test("GET /tasks/{id} returns 404 for unknown task", async ({ request }) => {
 test("POST /tasks/{id}/push returns 409 for non-completed task", async ({
   request,
 }) => {
-  // TODO: agent_id is now required — need to fetch from GET /agents first.
+  const agentId = await getAgentId(request);
+
   const createResponse = await request.post(`${API_URL}/tasks`, {
     data: {
       project_type: "new",
+      project_name: "E2E Push Test",
+      agent_id: agentId,
       requirements: "E2E push test task",
     },
   });
@@ -74,10 +89,13 @@ test("POST /tasks/{id}/push returns 404 for unknown task", async ({
 test("GET /tasks returns list including newly created task", async ({
   request,
 }) => {
-  // TODO: agent_id is now required — need to fetch from GET /agents first.
+  const agentId = await getAgentId(request);
+
   const createResponse = await request.post(`${API_URL}/tasks`, {
     data: {
       project_type: "new",
+      project_name: "E2E List Test",
+      agent_id: agentId,
       requirements: "E2E list task check",
     },
   });
