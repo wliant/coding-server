@@ -105,8 +105,7 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Project</th>
-                <th className="px-4 py-3 text-left font-medium">Dev Agent</th>
-                <th className="px-4 py-3 text-left font-medium">Test Agent</th>
+                <th className="px-4 py-3 text-left font-medium">Agent</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Submitted</th>
                 <th className="px-4 py-3 text-left font-medium">Actions</th>
@@ -126,10 +125,7 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    Spec Driven
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    Generic Testing
+                    {task.agent?.display_name ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={task.status} />
