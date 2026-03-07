@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Multi-Agent Software Development System API",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "paths": {
     "/health": {
@@ -27,7 +27,9 @@
       "get": {
         "summary": "List Agents",
         "operationId": "listAgents",
-        "tags": ["agents"],
+        "tags": [
+          "agents"
+        ],
         "description": "Returns all active agents from the agent registry, ordered by display_name.",
         "responses": {
           "200": {
@@ -51,7 +53,9 @@
       "get": {
         "summary": "List Projects",
         "operationId": "list_projects_projects_get",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -74,7 +78,9 @@
       "get": {
         "summary": "List Tasks",
         "operationId": "list_tasks_tasks_get",
-        "tags": ["tasks"],
+        "tags": [
+          "tasks"
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -95,7 +101,9 @@
       "post": {
         "summary": "Create Task",
         "operationId": "create_task_tasks_post",
-        "tags": ["tasks"],
+        "tags": [
+          "tasks"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -134,7 +142,9 @@
       "get": {
         "summary": "Get Task Detail",
         "operationId": "getTaskDetail",
-        "tags": ["tasks"],
+        "tags": [
+          "tasks"
+        ],
         "parameters": [
           {
             "name": "task_id",
@@ -173,7 +183,9 @@
       "patch": {
         "summary": "Update Task",
         "operationId": "update_task_tasks__task_id__patch",
-        "tags": ["tasks"],
+        "tags": [
+          "tasks"
+        ],
         "parameters": [
           {
             "name": "task_id",
@@ -223,7 +235,9 @@
       "post": {
         "summary": "Push Task To Remote",
         "operationId": "pushTaskToRemote",
-        "tags": ["tasks"],
+        "tags": [
+          "tasks"
+        ],
         "description": "Pushes the task's work directory to a remote git repository. If git_url is provided in the body, it is saved to the project record before the push.",
         "parameters": [
           {
@@ -313,7 +327,9 @@
       "get": {
         "summary": "Get Settings",
         "operationId": "get_settings_settings_get",
-        "tags": ["settings"],
+        "tags": [
+          "settings"
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -325,12 +341,15 @@
               }
             }
           }
-        }
+        },
+        "description": "Return all settings with defaults for any unset key. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key"
       },
       "put": {
         "summary": "Update Settings",
         "operationId": "update_settings_settings_put",
-        "tags": ["settings"],
+        "tags": [
+          "settings"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -362,7 +381,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Partial update: only supply keys to change. Unknown keys return 422. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key"
       }
     }
   },
@@ -387,7 +407,11 @@
           }
         },
         "type": "object",
-        "required": ["id", "identifier", "display_name"],
+        "required": [
+          "id",
+          "identifier",
+          "display_name"
+        ],
         "title": "AgentSummary"
       },
       "AgentResponse": {
@@ -416,7 +440,13 @@
           }
         },
         "type": "object",
-        "required": ["id", "identifier", "display_name", "is_active", "created_at"],
+        "required": [
+          "id",
+          "identifier",
+          "display_name",
+          "is_active",
+          "created_at"
+        ],
         "title": "AgentResponse"
       },
       "PushTaskRequest": {
@@ -452,7 +482,10 @@
           }
         },
         "type": "object",
-        "required": ["status", "components"],
+        "required": [
+          "status",
+          "components"
+        ],
         "title": "HealthResponse"
       },
       "ProjectSummary": {
@@ -504,7 +537,10 @@
           }
         },
         "type": "object",
-        "required": ["id", "source_type"],
+        "required": [
+          "id",
+          "source_type"
+        ],
         "title": "ProjectSummary"
       },
       "ProjectSummaryWithGitUrl": {
@@ -555,29 +591,45 @@
           }
         },
         "type": "object",
-        "required": ["id", "source_type"],
+        "required": [
+          "id",
+          "source_type"
+        ],
         "title": "ProjectSummaryWithGitUrl"
       },
       "TaskStatus": {
         "type": "string",
-        "enum": ["pending", "aborted", "in_progress", "completed", "failed"],
+        "enum": [
+          "pending",
+          "aborted",
+          "in_progress",
+          "completed",
+          "failed"
+        ],
         "title": "TaskStatus"
       },
       "DevAgentType": {
         "type": "string",
-        "enum": ["spec_driven_development"],
+        "enum": [
+          "spec_driven_development"
+        ],
         "title": "DevAgentType",
         "deprecated": true
       },
       "TestAgentType": {
         "type": "string",
-        "enum": ["generic_testing"],
+        "enum": [
+          "generic_testing"
+        ],
         "title": "TestAgentType",
         "deprecated": true
       },
       "ProjectType": {
         "type": "string",
-        "enum": ["new", "existing"],
+        "enum": [
+          "new",
+          "existing"
+        ],
         "title": "ProjectType"
       },
       "TaskResponse": {
@@ -821,7 +873,11 @@
           }
         },
         "type": "object",
-        "required": ["branch_name", "remote_url", "pushed_at"],
+        "required": [
+          "branch_name",
+          "remote_url",
+          "pushed_at"
+        ],
         "title": "PushResponse"
       },
       "ErrorResponse": {
@@ -832,7 +888,9 @@
           }
         },
         "type": "object",
-        "required": ["detail"],
+        "required": [
+          "detail"
+        ],
         "title": "ErrorResponse"
       },
       "CreateTaskRequest": {
@@ -989,7 +1047,9 @@
           }
         },
         "type": "object",
-        "required": ["settings"],
+        "required": [
+          "settings"
+        ],
         "title": "SettingsResponse"
       },
       "UpdateSettingsRequest": {
@@ -1003,7 +1063,9 @@
           }
         },
         "type": "object",
-        "required": ["settings"],
+        "required": [
+          "settings"
+        ],
         "title": "UpdateSettingsRequest"
       },
       "HTTPValidationError": {
@@ -1045,7 +1107,11 @@
           }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       }
     }

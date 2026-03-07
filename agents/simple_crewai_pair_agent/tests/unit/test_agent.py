@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from crewai import Process
+from crewai_tools import FileReadTool, FileWriterTool
 
 from simple_crewai_pair_agent.config import CodingAgentConfig
 from simple_crewai_pair_agent.crewai_agents import make_coder_agent, make_reviewer_agent
@@ -44,23 +45,59 @@ def test_reviewer_agent_no_code_execution(fake_llm):
 # ---------------------------------------------------------------------------
 
 
-def test_coding_task_output_file(fake_llm, tmp_path):
+def test_coding_task_has_file_writer_tool(fake_llm, tmp_path):
     agent = make_coder_agent(llm=fake_llm)
-    task = make_coding_task(agent=agent, working_directory=tmp_path, project_name="proj")
-    assert task.output_file == str(tmp_path / "proj.py")
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
+    tool_types = [type(t) for t in task.tools]
+    assert FileWriterTool in tool_types
+
+
+def test_coding_task_has_file_reader_tool(fake_llm, tmp_path):
+    agent = make_coder_agent(llm=fake_llm)
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
+    tool_types = [type(t) for t in task.tools]
+    assert FileReadTool in tool_types
+
+
+def test_coding_task_no_output_file(fake_llm, tmp_path):
+    agent = make_coder_agent(llm=fake_llm)
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
+    assert not task.output_file
 
 
 def test_coding_task_description_contains_requirement_placeholder(fake_llm, tmp_path):
     agent = make_coder_agent(llm=fake_llm)
-    task = make_coding_task(agent=agent, working_directory=tmp_path, project_name="x")
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
     assert "{requirement}" in task.description
+
+
+def test_coding_task_description_contains_working_directory(fake_llm, tmp_path):
+    agent = make_coder_agent(llm=fake_llm)
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
+    assert str(tmp_path) in task.description
+
+
+def test_coding_task_writer_configured_with_working_directory(fake_llm, tmp_path):
+    agent = make_coder_agent(llm=fake_llm)
+    task = make_coding_task(agent=agent, working_directory=tmp_path)
+    writer = next(t for t in task.tools if isinstance(t, FileWriterTool))
+    assert writer.directory == str(tmp_path)
+
+
+def test_review_task_has_file_reader_tool(fake_llm, tmp_path):
+    coder = make_coder_agent(llm=fake_llm)
+    reviewer = make_reviewer_agent(llm=fake_llm)
+    coding = make_coding_task(agent=coder, working_directory=tmp_path)
+    review = make_review_task(agent=reviewer, coding_task=coding, working_directory=tmp_path)
+    tool_types = [type(t) for t in review.tools]
+    assert FileReadTool in tool_types
 
 
 def test_review_task_context_contains_coding_task(fake_llm, tmp_path):
     coder = make_coder_agent(llm=fake_llm)
     reviewer = make_reviewer_agent(llm=fake_llm)
-    coding = make_coding_task(agent=coder, working_directory=tmp_path, project_name="x")
-    review = make_review_task(agent=reviewer, coding_task=coding)
+    coding = make_coding_task(agent=coder, working_directory=tmp_path)
+    review = make_review_task(agent=reviewer, coding_task=coding, working_directory=tmp_path)
     assert coding in review.context
 
 
@@ -105,12 +142,45 @@ def test_review_task_context_contains_coding_task_in_crew(crew_obj):
     assert coding_task in review_task.context
 
 
+def test_crew_init_logs_config(fake_llm, coding_config, caplog):
+    """CodingCrew.__init__ emits a structured log with the full config."""
+    import logging
+    from simple_crewai_pair_agent.crew import CodingCrew
+
+    with patch("simple_crewai_pair_agent.crew.make_llm", return_value=fake_llm):
+        with caplog.at_level(logging.INFO, logger="simple_crewai_pair_agent.crew"):
+            CodingCrew(config=coding_config)
+
+    assert any("crew_initializing" in r.message for r in caplog.records)
+
+
 # ---------------------------------------------------------------------------
 # CodingAgent
 # ---------------------------------------------------------------------------
 
 
-def test_coding_agent_sets_openai_env(tmp_path, monkeypatch):
+def test_coding_agent_sets_openai_env_from_config(tmp_path, monkeypatch):
+    """OPENAI_API_KEY is always set from config, not from existing env vars."""
+    import os
+
+    from simple_crewai_pair_agent.agent import CodingAgent
+
+    monkeypatch.setenv("OPENAI_API_KEY", "env-key-should-be-overridden")
+    cfg = CodingAgentConfig(
+        working_directory=tmp_path,
+        project_name="p",
+        requirement="r",
+        openai_api_key="config-key",
+    )
+    CodingAgent(cfg)
+
+    assert os.environ.get("OPENAI_API_KEY") == "config-key"
+
+
+def test_coding_agent_uses_placeholder_when_openai_key_empty(tmp_path, monkeypatch):
+    """When openai_api_key is empty, OPENAI_API_KEY is set to PLACEHOLDER."""
+    import os
+
     from simple_crewai_pair_agent.agent import CodingAgent
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -118,12 +188,11 @@ def test_coding_agent_sets_openai_env(tmp_path, monkeypatch):
         working_directory=tmp_path,
         project_name="p",
         requirement="r",
-        openai_api_key="test-key",
+        openai_api_key="",
     )
     CodingAgent(cfg)
-    import os
 
-    assert os.environ.get("OPENAI_API_KEY") in ("test-key", "NA")
+    assert os.environ.get("OPENAI_API_KEY") == "PLACEHOLDER"
 
 
 def test_coding_agent_run_calls_crew(tmp_path, fake_llm, mock_llm_call):

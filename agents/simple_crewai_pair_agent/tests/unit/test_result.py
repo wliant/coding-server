@@ -21,6 +21,11 @@ def test_frozen_raises_on_mutation() -> None:
         result.code = "changed"  # type: ignore[misc]
 
 
+def test_output_file_defaults_to_none() -> None:
+    result = CodingAgentResult(code="x = 1", review="LGTM")
+    assert result.output_file is None
+
+
 def test_is_frozen_dataclass() -> None:
     assert dataclasses.is_dataclass(CodingAgentResult)
     assert dataclasses.fields(CodingAgentResult)  # has fields

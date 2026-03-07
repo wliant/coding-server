@@ -13,8 +13,8 @@ class CodingAgent(BaseAgent):
 
     def __init__(self, config: CodingAgentConfig) -> None:
         super().__init__(config)
-        # CrewAI validates OPENAI_API_KEY at import time; satisfy it from config.
-        os.environ.setdefault("OPENAI_API_KEY", config.openai_api_key)
+        # CrewAI validates OPENAI_API_KEY at import time; always set from config.
+        os.environ["OPENAI_API_KEY"] = config.openai_api_key or "PLACEHOLDER"
 
     def run(self) -> CodingAgentResult:
         """Execute the coding crew and return the result."""
