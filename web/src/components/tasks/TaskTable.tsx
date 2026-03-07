@@ -29,7 +29,7 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     const reqMatch = task.requirements.toLowerCase().includes(q);
-    const nameMatch = (task.project.name ?? "").toLowerCase().includes(q);
+    const nameMatch = getProjectLabel(task.project).toLowerCase().includes(q);
     return reqMatch || nameMatch;
   });
 
@@ -67,6 +67,15 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
       setDialogOpen(false);
       setAbortingTaskId(null);
     }
+  };
+
+  const getProjectLabel = (project: TaskResponse["project"]) => {
+    if (project.name) return project.name;
+    if (project.git_url) {
+      const match = project.git_url.match(/\/([^/]+?)(?:\.git)?$/);
+      return match ? match[1] : project.git_url;
+    }
+    return "New Project";
   };
 
   const formatDate = (dateStr: string) => {
@@ -117,7 +126,7 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
                   <td className="px-4 py-3">
                     <Link href={`/tasks/${task.id}`} className="block hover:underline">
                       <div className="font-medium">
-                        {task.project.name ?? "New Project"}
+                        {getProjectLabel(task.project)}
                       </div>
                       <div className="text-xs text-muted-foreground truncate max-w-xs">
                         {task.requirements}
