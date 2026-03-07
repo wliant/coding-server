@@ -19,12 +19,6 @@ class Job(Base):
     )
     requirement: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
-    dev_agent_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="spec_driven_development"
-    )
-    test_agent_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="generic_testing"
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

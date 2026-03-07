@@ -53,11 +53,6 @@ services:
       - ./agent-work:/agent-work
     environment:
       PYTHONPATH: /app/agents/simple_crewai_pair_agent/src:/app/src
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder:7b}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-NA}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
       LEASE_TTL_SECONDS: ${LEASE_TTL_SECONDS:-300}
       LEASE_RENEWAL_INTERVAL_SECONDS: ${LEASE_RENEWAL_INTERVAL_SECONDS:-120}

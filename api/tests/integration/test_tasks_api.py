@@ -267,8 +267,7 @@ async def test_patch_task_abort_non_pending_returns_422(client, test_session):
         project_id=project.id,
         requirement="Running task",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     test_session.add(job)
     await test_session.commit()
@@ -399,8 +398,7 @@ async def test_get_task_detail_includes_elapsed_seconds_for_in_progress(client, 
         project_id=project.id,
         requirement="Running task",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
         started_at=datetime.now(timezone.utc) - timedelta(seconds=30),
     )
     test_session.add(job)
@@ -468,8 +466,7 @@ async def test_push_returns_422_when_project_has_no_git_url(client, test_session
         project_id=project.id,
         requirement="Completed task",
         status="completed",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     test_session.add(job)
     await test_session.commit()
@@ -497,8 +494,7 @@ async def test_push_returns_200_with_push_response_shape_on_success(client, test
         project_id=project.id,
         requirement="Completed task",
         status="completed",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     test_session.add(job)
     await test_session.flush()

@@ -608,22 +608,6 @@
         ],
         "title": "TaskStatus"
       },
-      "DevAgentType": {
-        "type": "string",
-        "enum": [
-          "spec_driven_development"
-        ],
-        "title": "DevAgentType",
-        "deprecated": true
-      },
-      "TestAgentType": {
-        "type": "string",
-        "enum": [
-          "generic_testing"
-        ],
-        "title": "TestAgentType",
-        "deprecated": true
-      },
       "ProjectType": {
         "type": "string",
         "enum": [
@@ -681,30 +665,6 @@
               }
             ],
             "title": "Error Message"
-          },
-          "dev_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DevAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Deprecated: legacy field. Use agent instead."
-          },
-          "test_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TestAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Deprecated: legacy field. Use agent instead."
           }
         },
         "type": "object",
@@ -816,30 +776,6 @@
             "title": "Elapsed Seconds",
             "description": "Seconds elapsed since started_at; non-null only when status is in_progress"
           },
-          "dev_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DevAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Deprecated: legacy field. Use agent instead."
-          },
-          "test_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TestAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "Deprecated: legacy field. Use agent instead."
-          },
           "branch": {
             "anyOf": [
               {
@@ -946,34 +882,6 @@
             "minLength": 1,
             "title": "Requirements"
           },
-          "dev_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DevAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dev Agent Type",
-            "deprecated": true,
-            "description": "Deprecated: use agent_id instead. Retained for backward compatibility.",
-            "default": "spec_driven_development"
-          },
-          "test_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TestAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Test Agent Type",
-            "deprecated": true,
-            "description": "Deprecated: use agent_id instead. Retained for backward compatibility.",
-            "default": "generic_testing"
-          },
           "branch": {
             "anyOf": [
               {
@@ -1033,30 +941,6 @@
               }
             ],
             "title": "Requirements"
-          },
-          "dev_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DevAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dev Agent Type",
-            "deprecated": true
-          },
-          "test_agent_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TestAgentType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Test Agent Type",
-            "deprecated": true
           }
         },
         "type": "object",

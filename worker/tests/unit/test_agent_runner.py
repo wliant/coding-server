@@ -27,8 +27,7 @@ async def _seed_job_with_project(db_session, project_name: str | None = "test-pr
         project_id=project.id,
         requirement="Add a hello world function",
         status="in_progress",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     db_session.add(job)
     await db_session.commit()

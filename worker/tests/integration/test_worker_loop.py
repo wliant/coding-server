@@ -35,8 +35,7 @@ async def _seed_pending_job(session: AsyncSession, requirement: str = "Build X")
         project_id=project.id,
         requirement=requirement,
         status="pending",
-        dev_agent_type="spec_driven_development",
-        test_agent_type="generic_testing",
+
     )
     session.add(job)
     await session.commit()
@@ -56,8 +55,6 @@ async def test_single_poll_cycle_claims_and_completes_pending_job(memory_db, tmp
         POLL_INTERVAL_SECONDS=5,
         LEASE_TTL_SECONDS=300,
         LEASE_RENEWAL_INTERVAL_SECONDS=120,
-        LLM_PROVIDER="ollama",
-        LLM_MODEL="qwen2.5-coder:7b",
     )
 
     async with memory_db() as session:
@@ -102,8 +99,6 @@ async def test_single_poll_cycle_sets_failed_on_agent_exception(memory_db, tmp_p
         POLL_INTERVAL_SECONDS=5,
         LEASE_TTL_SECONDS=300,
         LEASE_RENEWAL_INTERVAL_SECONDS=120,
-        LLM_PROVIDER="ollama",
-        LLM_MODEL="qwen2.5-coder:7b",
     )
 
     async with memory_db() as session:

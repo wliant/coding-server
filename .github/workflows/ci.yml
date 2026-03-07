@@ -19,6 +19,17 @@ jobs:
         with:
           version: '3.x'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install web dependencies and generate client
+        working-directory: web
+        run: |
+          npm ci
+          npm run generate
+
       - name: Copy env file
         run: cp .env.example .env
 

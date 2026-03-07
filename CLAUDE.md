@@ -1,12 +1,15 @@
 # coding-machine Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-02
+Last updated: 2026-03-07
 
 ## Active Technologies
-- Python 3.12 (api), TypeScript / Node.js 20 (web) + FastAPI 0.115+ / SQLAlchemy 2 async / asyncpg / Alembic (api); Next.js 15 App Router / React 19 / Tailwind CSS / shadcn/ui / @hey-api/client-fetch (web) (002-task-management-ui)
-- PostgreSQL 16 — existing `jobs` and `projects` tables extended; new `settings` table added via migration `0002` (002-task-management-ui)
 
-- Python 3.12 (api, worker, tools); TypeScript / Node.js 20 (web) (001-project-setup)
+- **Backend (api)**: Python 3.12, FastAPI 0.115+, SQLAlchemy 2 async, asyncpg, Alembic
+- **Frontend (web)**: TypeScript, Node.js 20, Next.js 15 App Router, React 19, Tailwind CSS, shadcn/ui, @hey-api/client-fetch
+- **Worker**: Python 3.12, CrewAI (via simple_crewai_pair_agent)
+- **Tools**: Python 3.12, FastMCP
+- **Database**: PostgreSQL 16 (tables: projects, jobs, agents, settings, work_directories)
+- **Cache/Queue**: Redis
 
 ## Project Structure
 
@@ -14,7 +17,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-02
 coding-machine/
 ├── compose.yaml / compose.dev.yaml / compose.e2e.yaml / compose.prod.yaml
 ├── openapi.json          # committed OpenAPI spec (source of truth for client gen)
-├── Taskfile.yml          # cross-platform task runner (replaces Makefile)
+├── Taskfile.yml          # cross-platform task runner
+├── specs/spec.md         # consolidated system specification
 ├── web/                  # Next.js 15 web interface
 │   ├── src/
 │   └── tests/
@@ -22,12 +26,16 @@ coding-machine/
 │   ├── src/api/
 │   ├── tests/
 │   └── alembic/
-├── worker/               # LangGraph agent worker
+├── worker/               # Background job processor
 │   ├── src/worker/
 │   └── tests/
-└── tools/                # FastMCP tool servers
-    ├── src/tools/servers/
-    └── tests/
+├── tools/                # FastMCP tool servers
+│   ├── src/tools/servers/
+│   └── tests/
+└── agents/               # Agent libraries (uv workspace)
+    ├── simple_crewai_pair_agent/  # CrewAI pair agent (implemented)
+    ├── crewai_coding_team/        # Multi-agent team (stub)
+    └── simple_langchain_deepagent/ # LangChain agent (stub)
 ```
 
 ## Commands
@@ -63,11 +71,6 @@ cd web && npx tsc --noEmit
 
 - **Python** (api, worker, tools): ruff for linting/formatting; type hints required on all public functions; `src/` layout (package under `src/`); pytest + pytest-asyncio for all tests; `asyncio_mode = "auto"` in pyproject.toml
 - **TypeScript** (web): strict mode enabled; generated client code in `src/client/` (do not hand-edit); Prettier for formatting
-
-## Recent Changes
-- 002-task-management-ui: Added Python 3.12 (api), TypeScript / Node.js 20 (web) + FastAPI 0.115+ / SQLAlchemy 2 async / asyncpg / Alembic (api); Next.js 15 App Router / React 19 / Tailwind CSS / shadcn/ui / @hey-api/client-fetch (web)
-
-- 001-project-setup: Added Python 3.12 (api, worker, tools); TypeScript / Node.js 20 (web)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
