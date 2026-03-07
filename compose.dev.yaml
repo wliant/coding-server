@@ -52,6 +52,7 @@ services:
       - ./agents/simple_crewai_pair_agent/src:/app/agents/simple_crewai_pair_agent/src
       - ./agent-work:/agent-work
     environment:
+      PYTHONPATH: /app/agents/simple_crewai_pair_agent/src:/app/src
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder:7b}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}

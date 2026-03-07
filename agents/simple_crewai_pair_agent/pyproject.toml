@@ -5,6 +5,7 @@ description = "CrewAI pair-programming agent (Coder + Reviewer)"
 requires-python = ">=3.12"
 dependencies = [
     "crewai[litellm]>=0.100.0",
+    "crewai-tools>=0.1.0",
     "pydantic>=2",
 ]
 

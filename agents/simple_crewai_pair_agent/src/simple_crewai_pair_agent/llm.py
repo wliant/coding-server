@@ -22,6 +22,8 @@ def make_llm(config: CodingAgentConfig) -> LLM:
             model=f"ollama/{model}",
             base_url=config.ollama_base_url,
             temperature=temperature,
+            timeout=1800,  # 30 minutes — large local models can be slow
+            num_ctx=16384,  # limit context window to avoid slow KV-cache on large models
         )
 
     if provider == "openai":

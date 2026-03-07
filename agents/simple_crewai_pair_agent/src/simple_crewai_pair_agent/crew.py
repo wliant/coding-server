@@ -20,6 +20,24 @@ class CodingCrew:
     def __init__(self, config: CodingAgentConfig) -> None:
         self.config = config
 
+        logger.info(
+            "crew_initializing",
+            extra={
+                "event": "crew_initializing",
+                "working_directory": str(config.working_directory),
+                "project_name": config.project_name,
+                "llm_provider": config.llm_provider,
+                "llm_model": config.llm_model,
+                "llm_temperature": config.llm_temperature,
+                "ollama_base_url": config.ollama_base_url,
+                "openai_api_key_set": bool(
+                    config.openai_api_key
+                    and config.openai_api_key not in ("", "NA", "PLACEHOLDER")
+                ),
+                "anthropic_api_key_set": bool(config.anthropic_api_key),
+            },
+        )
+
         llm = make_llm(config)
         coder = make_coder_agent(llm=llm)
         reviewer = make_reviewer_agent(llm=llm)
@@ -27,9 +45,12 @@ class CodingCrew:
         coding = make_coding_task(
             agent=coder,
             working_directory=config.working_directory,
-            project_name=config.project_name,
         )
-        review = make_review_task(agent=reviewer, coding_task=coding)
+        review = make_review_task(
+            agent=reviewer,
+            coding_task=coding,
+            working_directory=config.working_directory,
+        )
 
         self._crew = Crew(
             agents=[coder, reviewer],
@@ -45,8 +66,9 @@ class CodingCrew:
             RuntimeError: If the crew fails due to an LLM or execution error.
         """
         logger.info(
-            "crew starting",
+            "crew_starting",
             extra={
+                "event": "crew_starting",
                 "project_name": self.config.project_name,
                 "working_directory": str(self.config.working_directory),
             },
@@ -58,24 +80,28 @@ class CodingCrew:
             raise
         except Exception as exc:
             logger.error(
-                "crew failed",
-                extra={"error": str(exc), "project_name": self.config.project_name},
+                "crew_failed",
+                extra={"event": "crew_failed", "error": str(exc), "project_name": self.config.project_name},
             )
             raise RuntimeError(f"Crew execution failed: {exc}") from exc
 
-        output_file = self.config.working_directory / f"{self.config.project_name}.py"
+        # Find the most recently written .py file in the working directory
+        py_files = sorted(
+            self.config.working_directory.glob("*.py"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True,
+        )
+        output_file = py_files[0] if py_files else None
+        code = output_file.read_text(encoding="utf-8") if output_file else ""
 
-        # Read the generated code from disk (written by CrewAI via output_file)
-        code = output_file.read_text(encoding="utf-8") if output_file.exists() else ""
-
-        # The final task output (review report) is in crew_output.raw
         review = str(crew_output.raw) if crew_output.raw else ""
 
         logger.info(
-            "crew completed",
+            "crew_completed",
             extra={
+                "event": "crew_completed",
                 "project_name": self.config.project_name,
-                "output_file": str(output_file),
+                "output_file": str(output_file) if output_file else None,
                 "code_length": len(code),
                 "elapsed_seconds": round(time.monotonic() - _start, 2),
             },

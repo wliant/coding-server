@@ -9,11 +9,11 @@ class CodingAgentResult:
     """Stable public return type for CodingAgent.run().
 
     Fields:
-        code:        Generated Python source code (content of output file).
+        code:        Generated Python source code (content of the written file).
         review:      Code review report produced by the reviewer agent.
-        output_file: Absolute path to the written source file on disk.
+        output_file: Path to the file written by the agent, or None if no file was found.
     """
 
     code: str
     review: str
-    output_file: Path
+    output_file: Path | None = None
