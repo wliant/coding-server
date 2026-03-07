@@ -15,6 +15,7 @@ ALLOWED_KEYS: set[str] = {
     "agent.simple_crewai.ollama_base_url",
     "agent.simple_crewai.openai_api_key",
     "agent.simple_crewai.anthropic_api_key",
+    "github.token",
 }
 
 DEFAULTS: dict[str, str] = {
@@ -25,6 +26,7 @@ DEFAULTS: dict[str, str] = {
     "agent.simple_crewai.ollama_base_url": "http://localhost:11434",
     "agent.simple_crewai.openai_api_key": "",
     "agent.simple_crewai.anthropic_api_key": "",
+    "github.token": "",
 }
 
 _VALID_PROVIDERS = {"ollama", "openai", "anthropic"}

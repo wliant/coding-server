@@ -327,3 +327,60 @@ async def test_resubmit_task_on_completed_raises_422(db_session):
         await task_service.resubmit_task(db_session, job.id, updates)
 
     assert exc_info.value.status_code == 422
+
+
+# --- _inject_github_token tests ---
+
+from api.services.task_service import _inject_github_token
+
+
+def test_inject_github_token_transforms_https_github_url():
+    result = _inject_github_token("https://github.com/org/repo.git", "ghp_abc")
+    assert result == "https://ghp_abc@github.com/org/repo.git"
+
+
+def test_inject_github_token_leaves_empty_token_unchanged():
+    url = "https://github.com/org/repo.git"
+    assert _inject_github_token(url, "") == url
+
+
+def test_inject_github_token_leaves_ssh_unchanged():
+    url = "git@github.com:org/repo.git"
+    assert _inject_github_token(url, "ghp_abc") == url
+
+
+async def test_create_task_stores_branch(db_session):
+    """create_task persists branch field on the job."""
+    from api.schemas.task import CreateTaskRequest, DevAgentType, ProjectType, TestAgentType
+
+    req = CreateTaskRequest(
+        project_type=ProjectType.existing,
+        agent_id=_AGENT_ID,
+        git_url="https://github.com/org/repo.git",
+        branch="feature/my-feature",
+        dev_agent_type=DevAgentType.spec_driven_development,
+        test_agent_type=TestAgentType.generic_testing,
+        requirements="Add feature",
+    )
+
+    job, project, agent = await task_service.create_task(db_session, req)
+
+    assert job.branch == "feature/my-feature"
+
+
+async def test_create_task_branch_defaults_to_none(db_session):
+    """create_task with no branch leaves job.branch as None."""
+    from api.schemas.task import CreateTaskRequest, DevAgentType, ProjectType, TestAgentType
+
+    req = CreateTaskRequest(
+        project_type=ProjectType.new,
+        project_name="No Branch Project",
+        agent_id=_AGENT_ID,
+        dev_agent_type=DevAgentType.spec_driven_development,
+        test_agent_type=TestAgentType.generic_testing,
+        requirements="Build something",
+    )
+
+    job, project, agent = await task_service.create_task(db_session, req)
+
+    assert job.branch is None

@@ -42,6 +42,7 @@ class Job(Base):
     lease_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class Project(Base):

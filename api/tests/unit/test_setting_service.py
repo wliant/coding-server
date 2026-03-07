@@ -12,11 +12,12 @@ ALL_DEFAULTS = {
     "agent.simple_crewai.ollama_base_url": "http://localhost:11434",
     "agent.simple_crewai.openai_api_key": "",
     "agent.simple_crewai.anthropic_api_key": "",
+    "github.token": "",
 }
 
 
 async def test_get_settings_returns_defaults_when_empty(db_session):
-    """get_settings returns all 7 defaults when settings table is empty."""
+    """get_settings returns all 8 defaults when settings table is empty."""
     result = await setting_service.get_settings(db_session)
 
     assert result == ALL_DEFAULTS
@@ -83,8 +84,8 @@ async def test_upsert_all_six_agent_keys_accepted(db_session):
     assert result["agent.simple_crewai.anthropic_api_key"] == "ant-test"
 
 
-async def test_get_settings_returns_all_seven_keys_with_defaults(db_session):
-    """get_settings always returns all 7 keys including 6 new agent keys."""
+async def test_get_settings_returns_all_eight_keys_with_defaults(db_session):
+    """get_settings always returns all 8 keys including 6 agent keys and github.token."""
     result = await setting_service.get_settings(db_session)
 
     assert set(result.keys()) == set(ALL_DEFAULTS.keys())
@@ -172,3 +173,26 @@ async def test_upsert_llm_temperature_empty_raises_422(db_session):
         )
 
     assert exc_info.value.status_code == 422
+
+
+# --- github.token tests ---
+
+
+async def test_get_settings_includes_github_token_with_empty_default(db_session):
+    """get_settings returns github.token with empty-string default."""
+    result = await setting_service.get_settings(db_session)
+    assert "github.token" in result
+    assert result["github.token"] == ""
+
+
+async def test_upsert_github_token_accepted(db_session):
+    """upsert_settings accepts and persists github.token."""
+    result = await setting_service.upsert_settings(db_session, {"github.token": "ghp_abc123"})
+    assert result["github.token"] == "ghp_abc123"
+
+
+async def test_upsert_github_token_can_be_cleared(db_session):
+    """github.token can be set then cleared back to empty string."""
+    await setting_service.upsert_settings(db_session, {"github.token": "ghp_abc123"})
+    result = await setting_service.upsert_settings(db_session, {"github.token": ""})
+    assert result["github.token"] == ""

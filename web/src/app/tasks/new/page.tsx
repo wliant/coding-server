@@ -31,6 +31,7 @@ export default function NewTaskPage() {
           project_name: data.project_name ?? null,
           agent_id: data.agent_id,
           git_url: data.git_url ?? null,
+          branch: data.branch ?? null,
           requirements: data.requirements,
         },
       });

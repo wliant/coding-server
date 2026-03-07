@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 RUN adduser --system --uid 1001 appuser && mkdir -p /home/appuser && chown appuser /home/appuser
 
 ENV HOME=/home/appuser

@@ -18,6 +18,7 @@ export interface TaskFormValues {
   project_name?: string;
   agent_id: string;
   git_url?: string;
+  branch?: string;
   requirements: string;
 }
 
@@ -33,6 +34,7 @@ const DEFAULT_VALUES: TaskFormValues = {
   project_name: "",
   agent_id: "",
   git_url: "",
+  branch: "",
   requirements: "",
 };
 
@@ -52,6 +54,7 @@ export function TaskForm({
   );
   const [agentId, setAgentId] = useState<string>(merged.agent_id ?? "");
   const [gitUrl, setGitUrl] = useState<string>(merged.git_url ?? "");
+  const [branch, setBranch] = useState<string>(merged.branch ?? "");
   const [requirements, setRequirements] = useState<string>(
     merged.requirements
   );
@@ -74,6 +77,7 @@ export function TaskForm({
       project_name: isExisting ? undefined : projectName.trim(),
       agent_id: agentId,
       git_url: gitUrl.trim() || undefined,
+      branch: branch.trim() || undefined,
       requirements,
     };
 
@@ -142,6 +146,25 @@ export function TaskForm({
           onChange={(e) => setGitUrl(e.target.value)}
         />
       </div>
+
+      {/* Branch (only for existing projects) */}
+      {isExisting && (
+        <div className="space-y-2">
+          <label
+            htmlFor="branch-input"
+            className="block text-sm font-medium text-foreground"
+          >
+            Branch (optional)
+          </label>
+          <Input
+            id="branch-input"
+            aria-label="Branch"
+            placeholder="e.g. main or feature/my-feature"
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+          />
+        </div>
+      )}
 
       {/* Agent */}
       <div className="space-y-2">

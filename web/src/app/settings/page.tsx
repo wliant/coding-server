@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { AgentSettings } from "@/components/settings/AgentSettings";
+import { GitHubSettings } from "@/components/settings/GitHubSettings";
 import { getSettingsSettingsGet, updateSettingsSettingsPut } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
 
@@ -65,12 +66,16 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="agent">Agent Settings</TabsTrigger>
+          <TabsTrigger value="github">GitHub</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-6">
           <GeneralSettings initialSettings={settings} onSave={handleSave} />
         </TabsContent>
         <TabsContent value="agent" className="mt-6">
           <AgentSettings initialSettings={settings} onSave={handleSave} />
+        </TabsContent>
+        <TabsContent value="github" className="mt-6">
+          <GitHubSettings initialSettings={settings} onSave={handleSave} />
         </TabsContent>
       </Tabs>
     </div>

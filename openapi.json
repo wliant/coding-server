@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Multi-Agent Software Development System API",
-    "version": "0.4.1"
+    "version": "0.5.0"
   },
   "paths": {
     "/health": {
@@ -342,7 +342,7 @@
             }
           }
         },
-        "description": "Return all settings with defaults for any unset key. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key"
+        "description": "Return all settings with defaults for any unset key. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key, github.token"
       },
       "put": {
         "summary": "Update Settings",
@@ -382,7 +382,7 @@
             }
           }
         },
-        "description": "Partial update: only supply keys to change. Unknown keys return 422. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key"
+        "description": "Partial update: only supply keys to change. Unknown keys return 422. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key, github.token"
       }
     }
   },
@@ -839,6 +839,18 @@
             ],
             "deprecated": true,
             "description": "Deprecated: legacy field. Use agent instead."
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "default": null
           }
         },
         "type": "object",
@@ -961,6 +973,20 @@
             "deprecated": true,
             "description": "Deprecated: use agent_id instead. Retained for backward compatibility.",
             "default": "generic_testing"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "description": "Git branch to clone and check out. Created from default branch if it doesn't exist remotely. Null = use default branch.",
+            "default": null
           }
         },
         "type": "object",

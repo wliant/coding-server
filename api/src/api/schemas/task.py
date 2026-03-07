@@ -84,6 +84,7 @@ class TaskDetailResponse(BaseModel):
     error_message: str | None = None
     work_directory_path: str | None = None
     elapsed_seconds: int | None = None
+    branch: str | None = None
     dev_agent_type: DevAgentType | None = Field(
         default=None,
         deprecated=True,
@@ -113,6 +114,7 @@ class CreateTaskRequest(BaseModel):
     project_name: str | None = None
     agent_id: uuid.UUID
     git_url: str | None = None
+    branch: str | None = None
     requirements: str = Field(..., min_length=1)
     dev_agent_type: DevAgentType = Field(
         default=DevAgentType.spec_driven_development,

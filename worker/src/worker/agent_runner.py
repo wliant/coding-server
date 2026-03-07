@@ -2,17 +2,21 @@
 
 Wraps simple_crewai_pair_agent.CodingAgent to:
   - Fetch LLM configuration from the API's GET /settings endpoint
+  - Clone the project's git repository if git_url is set
   - Create the isolated working directory
   - Insert a WorkDirectory DB record
   - Return (success, error_message) tuple
 """
+import asyncio
 import logging
+import re
 import traceback
 from pathlib import Path
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from worker.git_utils import clone_repository
 from worker.models import Job, Project, WorkDirectory
 
 logger = logging.getLogger(__name__)
@@ -99,6 +103,47 @@ async def run_coding_agent(
     )
     db.add(work_directory)
     await db.commit()
+
+    # Clone the repository if git_url is configured
+    github_token = agent_settings.get("github.token", "")
+    if project.git_url:
+        safe_url = re.sub(r"https://[^@]+@", "https://", project.git_url)
+        logger.info(
+            "clone_started",
+            extra={
+                "event": "clone_started",
+                "job_id": str(job.id),
+                "git_url": safe_url,
+                "branch": job.branch,
+                "token_set": bool(github_token),
+            },
+        )
+        try:
+            await asyncio.to_thread(
+                clone_repository,
+                project.git_url,
+                work_dir,
+                branch=job.branch,
+                github_token=github_token,
+            )
+            logger.info(
+                "clone_succeeded",
+                extra={
+                    "event": "clone_succeeded",
+                    "job_id": str(job.id),
+                    "branch": job.branch,
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "clone_failed",
+                extra={
+                    "event": "clone_failed",
+                    "job_id": str(job.id),
+                    "error": str(exc),
+                },
+            )
+            return False, f"clone failed: {exc}"
 
     project_name = project.name if project.name else str(job.id)[:8]
 

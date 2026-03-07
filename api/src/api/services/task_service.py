@@ -9,8 +9,15 @@ from api.models.agent import Agent
 from api.models.job import Job, WorkDirectory
 from api.models.project import Project
 from api.schemas.task import CreateTaskRequest, PushResponse, UpdateTaskRequest
-from api.services import git_service
+from api.services import git_service, setting_service
 from api.services.project_service import create_project
+
+
+def _inject_github_token(url: str, token: str) -> str:
+    """Inject GitHub token into HTTPS URL for authenticated git operations."""
+    if token and url.startswith("https://github.com"):
+        return url.replace("https://", f"https://{token}@", 1)
+    return url
 
 
 async def create_task(
@@ -34,6 +41,7 @@ async def create_task(
         dev_agent_type=req.dev_agent_type.value,
         test_agent_type=req.test_agent_type.value,
         agent_id=req.agent_id,
+        branch=req.branch,
         status="pending",
         updated_at=now,
     )
@@ -135,6 +143,10 @@ async def trigger_push(
         raise HTTPException(
             status_code=422, detail="No working directory found for this task"
         )
+
+    settings = await setting_service.get_settings(db)
+    github_token = settings.get("github.token", "")
+    effective_git_url = _inject_github_token(effective_git_url, github_token)
 
     branch_name = f"task/{str(task_id)[:8]}"
 
