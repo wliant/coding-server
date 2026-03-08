@@ -1,0 +1,6 @@
+logs/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+uv.lock

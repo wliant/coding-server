@@ -31,6 +31,14 @@ tasks:
       - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up -d --wait
       - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e run --rm --no-deps test-runner
 
+  e2e-pytest:
+    desc: Run Python/pytest e2e tests in isolated environment (separate ports)
+    dotenv: ['.env.e2e']
+    cmds:
+      - defer: docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e down -v
+      - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e up -d --wait
+      - docker compose -f compose.yaml -f compose.e2e.yaml --env-file .env.e2e run --rm --no-deps pytest-runner
+
   prod:
     desc: Start production environment
     cmds:

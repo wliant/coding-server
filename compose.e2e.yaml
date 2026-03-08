@@ -55,3 +55,29 @@ services:
       tools:
         condition: service_healthy
     restart: "no"
+
+  pytest-runner:
+    build:
+      context: ./e2e-pytest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./e2e-pytest/logs:/app/logs
+    environment:
+      BASE_URL: http://web:3000
+      API_URL: http://api:8000
+      WORKER_URL: http://worker:8001
+      TOOLS_URL: http://tools:8002
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/madm
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-madm_e2e}
+    networks:
+      - backend
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+      tools:
+        condition: service_healthy
+    restart: "no"

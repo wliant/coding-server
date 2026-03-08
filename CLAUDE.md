@@ -1,6 +1,6 @@
 # coding-machine Development Guidelines
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## Active Technologies
 
@@ -26,14 +26,20 @@ coding-machine/
 │   ├── src/api/
 │   ├── tests/
 │   └── alembic/
-├── worker/               # Background job processor
-│   ├── src/worker/
+├── agents-controller/    # FastAPI service coordinating agents (port 8003)
+│   ├── src/controller/
 │   └── tests/
 ├── tools/                # FastMCP tool servers
 │   ├── src/tools/servers/
 │   └── tests/
-└── agents/               # Agent libraries (uv workspace)
-    ├── simple_crewai_pair_agent/  # CrewAI pair agent (implemented)
+└── agents/               # Agent packages (uv workspace); each is a self-contained deployable unit
+    ├── simple_crewai_pair_agent/  # CrewAI pair agent + worker service (implemented)
+    │   ├── Dockerfile
+    │   ├── alembic/
+    │   ├── src/
+    │   │   ├── simple_crewai_pair_agent/  # agent library
+    │   │   └── worker/                    # worker service (FastAPI)
+    │   └── tests/
     ├── crewai_coding_team/        # Multi-agent team (stub)
     └── simple_langchain_deepagent/ # LangChain agent (stub)
 ```
@@ -60,8 +66,9 @@ task generate
 
 # Lint Python (ruff)
 cd api && ruff check src/
-cd worker && ruff check src/
+cd agents/simple_crewai_pair_agent && ruff check src/
 cd tools && ruff check src/
+cd agents-controller && ruff check src/
 
 # Type-check frontend
 cd web && npx tsc --noEmit
@@ -77,3 +84,4 @@ cd web && npx tsc --noEmit
 
 ## Recent Changes
 - 009-agent-controller-worker: Added Python 3.12 (controller, worker); TypeScript / Node.js 20 (web) + FastAPI 0.115+, SQLAlchemy 2 async, asyncpg, pydantic-settings, python-json-logger, httpx (controller and worker); simple-crewai-pair-agent, gitpython (worker); Next.js 15, React 19, Tailwind CSS, shadcn/ui, @hey-api/client-fetch (web)
+- refactor: renamed `controller/` → `agents-controller/`; merged `worker/` into `agents/simple_crewai_pair_agent/` (worker service now bundled with agent package)

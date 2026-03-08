@@ -50,7 +50,7 @@ services:
 
   controller:
     build:
-      context: ./controller
+      context: ./agents-controller
     expose:
       - "8003"
     environment:
@@ -108,8 +108,7 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: worker/Dockerfile
+      context: ./agents/simple_crewai_pair_agent
     expose:
       - "8001"
     environment:

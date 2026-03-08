@@ -47,8 +47,8 @@ services:
     ports:
       - "${CONTROLLER_PORT:-8003}:8003"
     volumes:
-      - ./controller/src:/app/src
-      - ./controller/tests:/app/tests
+      - ./agents-controller/src:/app/src
+      - ./agents-controller/tests:/app/tests
     env_file:
       - .env
 
@@ -56,13 +56,12 @@ services:
     ports:
       - "${WORKER_PORT:-8001}:8001"
     volumes:
-      - ./worker/src:/app/src
-      - ./worker/tests:/app/tests
-      - ./worker/alembic:/app/alembic
-      - ./agents/simple_crewai_pair_agent/src:/app/agents/simple_crewai_pair_agent/src
+      - ./agents/simple_crewai_pair_agent/src:/app/src
+      - ./agents/simple_crewai_pair_agent/tests:/app/tests
+      - ./agents/simple_crewai_pair_agent/alembic:/app/alembic
       - ./agent-work:/agent-work
     environment:
-      PYTHONPATH: /app/agents/simple_crewai_pair_agent/src:/app/src
+      PYTHONPATH: /app/src
     env_file:
       - .env
 
