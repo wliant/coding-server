@@ -48,6 +48,28 @@ services:
         condition: service_healthy
     restart: "no"
 
+  controller:
+    build:
+      context: ./controller
+    expose:
+      - "8003"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-madm}
+      API_URL: http://api:8000
+      CONTROLLER_PORT: "8003"
+    networks:
+      - backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   tools:
     build:
       context: ./tools
@@ -91,22 +113,18 @@ services:
     expose:
       - "8001"
     environment:
-      REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-madm}
-      AGENT_WORK_PARENT: /agent-work
+      CONTROLLER_URL: http://controller:8003
+      AGENT_TYPE: ${AGENT_TYPE:-simple_crewai_pair_agent}
+      WORK_DIR: /agent-work
       TOOLS_GATEWAY_URL: http://tools:8002
-      API_URL: http://api:8000
-      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
-      LEASE_TTL_SECONDS: ${LEASE_TTL_SECONDS:-300}
-      LEASE_RENEWAL_INTERVAL_SECONDS: ${LEASE_RENEWAL_INTERVAL_SECONDS:-120}
+      HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-15}
     volumes:
       - agent_work:/agent-work
     networks:
       - backend
     depends_on:
-      api:
-        condition: service_healthy
-      redis:
+      controller:
         condition: service_healthy
       tools:
         condition: service_healthy

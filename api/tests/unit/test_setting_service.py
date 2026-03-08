@@ -5,7 +5,6 @@ from fastapi import HTTPException
 from api.services import setting_service
 
 ALL_DEFAULTS = {
-    "agent.work.path": "",
     "agent.simple_crewai.llm_provider": "ollama",
     "agent.simple_crewai.llm_model": "qwen2.5-coder:7b",
     "agent.simple_crewai.llm_temperature": "0.2",
@@ -17,7 +16,7 @@ ALL_DEFAULTS = {
 
 
 async def test_get_settings_returns_defaults_when_empty(db_session):
-    """get_settings returns all 8 defaults when settings table is empty."""
+    """get_settings returns all 7 defaults when settings table is empty."""
     result = await setting_service.get_settings(db_session)
 
     assert result == ALL_DEFAULTS
@@ -26,30 +25,30 @@ async def test_get_settings_returns_defaults_when_empty(db_session):
 async def test_get_settings_returns_persisted_value(db_session):
     """get_settings returns the stored value when a row exists."""
     await setting_service.upsert_settings(
-        db_session, {"agent.work.path": "/home/user/work"}
+        db_session, {"agent.simple_crewai.llm_provider": "openai"}
     )
 
     result = await setting_service.get_settings(db_session)
-    assert result["agent.work.path"] == "/home/user/work"
+    assert result["agent.simple_crewai.llm_provider"] == "openai"
 
 
 async def test_upsert_settings_inserts_on_first_call(db_session):
     """upsert_settings inserts a new row on first call."""
     result = await setting_service.upsert_settings(
-        db_session, {"agent.work.path": "/tmp"}
+        db_session, {"agent.simple_crewai.llm_model": "gpt-4o"}
     )
 
-    assert result["agent.work.path"] == "/tmp"
+    assert result["agent.simple_crewai.llm_model"] == "gpt-4o"
 
 
 async def test_upsert_settings_updates_on_subsequent_call(db_session):
     """upsert_settings updates the existing row on subsequent calls."""
-    await setting_service.upsert_settings(db_session, {"agent.work.path": "/tmp"})
+    await setting_service.upsert_settings(db_session, {"agent.simple_crewai.llm_model": "gpt-4o"})
     result = await setting_service.upsert_settings(
-        db_session, {"agent.work.path": "/var/work"}
+        db_session, {"agent.simple_crewai.llm_model": "gpt-4o-mini"}
     )
 
-    assert result["agent.work.path"] == "/var/work"
+    assert result["agent.simple_crewai.llm_model"] == "gpt-4o-mini"
 
 
 async def test_upsert_settings_unknown_key_raises_422(db_session):
@@ -84,8 +83,8 @@ async def test_upsert_all_six_agent_keys_accepted(db_session):
     assert result["agent.simple_crewai.anthropic_api_key"] == "ant-test"
 
 
-async def test_get_settings_returns_all_eight_keys_with_defaults(db_session):
-    """get_settings always returns all 8 keys including 6 agent keys and github.token."""
+async def test_get_settings_returns_all_seven_keys_with_defaults(db_session):
+    """get_settings always returns all 7 keys including 6 agent keys and github.token."""
     result = await setting_service.get_settings(db_session)
 
     assert set(result.keys()) == set(ALL_DEFAULTS.keys())

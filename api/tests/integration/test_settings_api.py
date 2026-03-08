@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from api.models.project import Base
+from api.models.agent import Agent  # noqa: F401
 from api.models.job import Job, WorkDirectory  # noqa: F401
 from api.models.setting import Setting  # noqa: F401
 
@@ -49,7 +50,7 @@ async def client(test_session):
 
 
 ALL_DEFAULT_KEYS = {
-    "agent.work.path",
+    "github.token",
     "agent.simple_crewai.llm_provider",
     "agent.simple_crewai.llm_model",
     "agent.simple_crewai.llm_temperature",
@@ -65,7 +66,7 @@ async def test_get_settings_returns_defaults_when_empty(client):
     assert response.status_code == 200
     data = response.json()
     assert set(data["settings"].keys()) == ALL_DEFAULT_KEYS
-    assert data["settings"]["agent.work.path"] == ""
+    assert data["settings"]["github.token"] == ""
     assert data["settings"]["agent.simple_crewai.llm_provider"] == "ollama"
     assert data["settings"]["agent.simple_crewai.llm_model"] == "qwen2.5-coder:7b"
     assert data["settings"]["agent.simple_crewai.llm_temperature"] == "0.2"
@@ -76,24 +77,24 @@ async def test_put_settings_valid_key_returns_200(client):
     """PUT /settings with valid key returns 200 with updated value."""
     response = await client.put(
         "/settings",
-        json={"settings": {"agent.work.path": "/home/user/work"}},
+        json={"settings": {"github.token": "ghp_test123"}},
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["settings"]["agent.work.path"] == "/home/user/work"
+    assert data["settings"]["github.token"] == "ghp_test123"
 
 
 async def test_get_settings_reflects_saved_value(client):
     """GET /settings reflects previously saved value."""
     await client.put(
         "/settings",
-        json={"settings": {"agent.work.path": "/custom/path"}},
+        json={"settings": {"github.token": "ghp_custom"}},
     )
 
     response = await client.get("/settings")
     assert response.status_code == 200
     data = response.json()
-    assert data["settings"]["agent.work.path"] == "/custom/path"
+    assert data["settings"]["github.token"] == "ghp_custom"
 
 
 async def test_put_settings_unknown_key_returns_422(client):
@@ -168,3 +169,4 @@ async def test_get_settings_returns_all_seven_keys_after_partial_update(client):
     assert data["settings"]["agent.simple_crewai.llm_provider"] == "anthropic"
     # Other keys should retain defaults
     assert data["settings"]["agent.simple_crewai.llm_model"] == "qwen2.5-coder:7b"
+    assert data["settings"]["github.token"] == ""

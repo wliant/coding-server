@@ -43,19 +43,26 @@ services:
     env_file:
       - .env
 
+  controller:
+    ports:
+      - "${CONTROLLER_PORT:-8003}:8003"
+    volumes:
+      - ./controller/src:/app/src
+      - ./controller/tests:/app/tests
+    env_file:
+      - .env
+
   worker:
     ports:
       - "${WORKER_PORT:-8001}:8001"
     volumes:
       - ./worker/src:/app/src
       - ./worker/tests:/app/tests
+      - ./worker/alembic:/app/alembic
       - ./agents/simple_crewai_pair_agent/src:/app/agents/simple_crewai_pair_agent/src
       - ./agent-work:/agent-work
     environment:
       PYTHONPATH: /app/agents/simple_crewai_pair_agent/src:/app/src
-      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
-      LEASE_TTL_SECONDS: ${LEASE_TTL_SECONDS:-300}
-      LEASE_RENEWAL_INTERVAL_SECONDS: ${LEASE_RENEWAL_INTERVAL_SECONDS:-120}
     env_file:
       - .env
 

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/tasks/StatusBadge";
 import { PushToRemoteButton } from "@/components/tasks/PushToRemoteButton";
-import { getTaskDetail } from "@/client/sdk.gen";
+import { initiateCleanupTasksTaskIdCleanupPost, getTaskDetail } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
 import type { TaskDetailResponse } from "@/client/types.gen";
 
@@ -19,6 +19,8 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<TaskDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!taskId) return;
@@ -141,6 +143,37 @@ export default function TaskDetailPage() {
         {task.status === "completed" && (
           <div className="pt-2 border-t">
             <PushToRemoteButton taskId={task.id} projectGitUrl={task.project.git_url} />
+          </div>
+        )}
+
+        {(task.status === "completed" || task.status === "failed") && (
+          <div className="pt-2 border-t space-y-2">
+            {cleanupError && (
+              <p className="text-sm text-red-600">{cleanupError}</p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isCleaningUp}
+              onClick={async () => {
+                setIsCleaningUp(true);
+                setCleanupError(null);
+                try {
+                  await initiateCleanupTasksTaskIdCleanupPost({ path: { task_id: taskId } });
+                  // Refresh task status
+                  const result = await getTaskDetail({ path: { task_id: taskId } });
+                  if (result.data) setTask(result.data);
+                } catch (err) {
+                  setCleanupError(
+                    err instanceof Error ? err.message : "Cleanup failed"
+                  );
+                } finally {
+                  setIsCleaningUp(false);
+                }
+              }}
+            >
+              {isCleaningUp ? "Cleaning up…" : "Clean Up"}
+            </Button>
           </div>
         )}
       </div>

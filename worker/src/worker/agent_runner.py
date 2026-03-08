@@ -1,28 +1,23 @@
 """Agent invocation for the worker.
 
-Wraps simple_crewai_pair_agent.CodingAgent to:
-  - Fetch LLM configuration from the API's GET /settings endpoint
-  - Clone the project's git repository if git_url is set
-  - Create the isolated working directory
-  - Insert a WorkDirectory DB record
-  - Return (success, error_message) tuple
+Accepts a WorkRequest dataclass (no DB session dependency).
+Persists execution state to the worker's own worker_executions table.
+Returns (success, error_message) tuple.
 """
 import asyncio
 import logging
 import re
 import traceback
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
-import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from worker.git_utils import clone_repository
-from worker.models import Job, Project, WorkDirectory
 
 logger = logging.getLogger(__name__)
 
-# Module-level import; set to None on ImportError so tests can still patch
-# worker.agent_runner.CodingAgent / CodingAgentConfig.
+# Module-level import; set to None on ImportError so tests can still patch.
 try:
     from simple_crewai_pair_agent import CodingAgent, CodingAgentConfig
 except ImportError:  # pragma: no cover
@@ -30,187 +25,199 @@ except ImportError:  # pragma: no cover
     CodingAgentConfig = None  # type: ignore[assignment, misc]
 
 
+@dataclass
+class WorkRequest:
+    task_id: str
+    requirements: str
+    agent_type: str
+    work_dir: str
+    git_url: str | None = None
+    branch: str | None = None
+    github_token: str | None = None
+    llm_config: dict | None = None
+
+
 def _resolve_agent_classes():
-    """Return (CodingAgent, CodingAgentConfig), retrying import if module-level failed."""
+    """Return (CodingAgent, CodingAgentConfig), retrying import if needed."""
     global CodingAgent, CodingAgentConfig  # noqa: PLW0603
     if CodingAgent is not None and CodingAgentConfig is not None:
         return CodingAgent, CodingAgentConfig
-    # Retry import — the package may have become available after worker startup
     from simple_crewai_pair_agent import CodingAgent as _CA, CodingAgentConfig as _CAC
     CodingAgent = _CA  # type: ignore[assignment]
     CodingAgentConfig = _CAC  # type: ignore[assignment]
     return CodingAgent, CodingAgentConfig
 
 
-async def _fetch_agent_settings(api_url: str) -> dict[str, str]:
-    """Fetch settings from the API. Raises httpx.RequestError on network failure."""
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{api_url}/settings")
-        response.raise_for_status()
-        data = response.json()
-        return data["settings"]
+async def _persist_execution_start(
+    task_id: str, agent_type: str, work_dir: str, session_factory
+) -> None:
+    """Upsert WorkExecution record at task start (handles retried tasks)."""
+    if session_factory is None:
+        return
+    from sqlalchemy import select, update
+    from worker.models import WorkExecution
+    try:
+        async with session_factory() as db:
+            existing = await db.execute(
+                select(WorkExecution).where(WorkExecution.task_id == uuid.UUID(task_id))
+            )
+            row = existing.scalar_one_or_none()
+            if row:
+                await db.execute(
+                    update(WorkExecution)
+                    .where(WorkExecution.task_id == uuid.UUID(task_id))
+                    .values(
+                        status="in_progress",
+                        started_at=datetime.now(timezone.utc),
+                        completed_at=None,
+                        error_message=None,
+                        work_dir_path=work_dir,
+                    )
+                )
+            else:
+                db.add(WorkExecution(
+                    task_id=uuid.UUID(task_id),
+                    agent_type=agent_type,
+                    status="in_progress",
+                    work_dir_path=work_dir,
+                ))
+            await db.commit()
+    except Exception as exc:
+        logger.warning("execution_persist_failed", extra={"error": str(exc)})
+
+
+async def _persist_execution_end(
+    task_id: str, status: str, error_message: str | None, session_factory
+) -> None:
+    """Update WorkExecution record at task completion."""
+    if session_factory is None:
+        return
+    from worker.models import WorkExecution
+    from sqlalchemy import update
+    try:
+        async with session_factory() as db:
+            await db.execute(
+                update(WorkExecution)
+                .where(WorkExecution.task_id == uuid.UUID(task_id))
+                .values(
+                    status=status,
+                    completed_at=datetime.now(timezone.utc),
+                    error_message=error_message,
+                )
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("execution_update_failed", extra={"error": str(exc)})
 
 
 async def run_coding_agent(
-    db: AsyncSession,
-    job: Job,
-    project: Project,
-    settings,
+    req: WorkRequest,
+    db_session_factory=None,
 ) -> tuple[bool, str | None]:
-    """Run the coding agent for the given job.
+    """Run the coding agent for the given WorkRequest.
 
-    1. Fetches config via GET {settings.API_URL}/settings
-       Returns (False, "unable to fetch agent settings") if API is unreachable.
-    2. Derives work_dir using agent.work.path from settings (must be absolute);
-       falls back to settings.AGENT_WORK_PARENT if empty or relative.
-    3. Creates a WorkDirectory DB record
-    4. Invokes CodingAgent(CodingAgentConfig(...)).run()
-    5. Returns (True, None) on success, (False, error_message) on failure
-
-    Any exception from the agent is caught and returned as an error result.
+    1. Persists WorkExecution record to worker's own DB.
+    2. Clones the repository if git_url is set.
+    3. Invokes CodingAgent.
+    4. Updates WorkExecution on completion.
+    5. Returns (True, None) on success, (False, error_message) on failure.
     """
-    # Fetch LLM configuration from the API
-    try:
-        agent_settings = await _fetch_agent_settings(settings.API_URL)
-    except httpx.RequestError as exc:
-        logger.error(
-            "settings_fetch_failed",
-            extra={"event": "settings_fetch_failed", "job_id": str(job.id), "error": str(exc)},
-        )
-        return False, "unable to fetch agent settings"
+    work_dir = Path(req.work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
-    configured_path = agent_settings.get("agent.work.path", "").strip()
-    work_base = configured_path if configured_path else settings.AGENT_WORK_PARENT
-    work_base_path = Path(work_base)
-    if not work_base_path.is_absolute():
-        logger.warning(
-            "work_path_not_absolute",
-            extra={
-                "event": "work_path_not_absolute",
-                "job_id": str(job.id),
-                "configured_path": work_base,
-                "fallback": settings.AGENT_WORK_PARENT,
-            },
-        )
-        work_base_path = Path(settings.AGENT_WORK_PARENT)
-    work_dir = work_base_path / str(job.id)
-    work_dir_path = str(work_dir)
-
-    # Insert WorkDirectory record before running the agent
-    work_directory = WorkDirectory(
-        job_id=job.id,
-        path=work_dir_path,
+    await _persist_execution_start(
+        req.task_id, req.agent_type, str(work_dir), db_session_factory
     )
-    db.add(work_directory)
-    await db.commit()
 
-    # Clone the repository if git_url is configured
-    github_token = agent_settings.get("github.token", "")
-    if project.git_url:
-        safe_url = re.sub(r"https://[^@]+@", "https://", project.git_url)
+    # Clone repository if git_url is configured
+    github_token = req.github_token or ""
+    if req.git_url:
+        safe_url = re.sub(r"https://[^@]+@", "https://", req.git_url)
         logger.info(
             "clone_started",
             extra={
                 "event": "clone_started",
-                "job_id": str(job.id),
+                "task_id": req.task_id,
                 "git_url": safe_url,
-                "branch": job.branch,
+                "branch": req.branch,
                 "token_set": bool(github_token),
             },
         )
         try:
             await asyncio.to_thread(
                 clone_repository,
-                project.git_url,
+                req.git_url,
                 work_dir,
-                branch=job.branch,
+                branch=req.branch,
                 github_token=github_token,
             )
             logger.info(
                 "clone_succeeded",
-                extra={
-                    "event": "clone_succeeded",
-                    "job_id": str(job.id),
-                    "branch": job.branch,
-                },
+                extra={"event": "clone_succeeded", "task_id": req.task_id, "branch": req.branch},
             )
         except Exception as exc:
             logger.error(
                 "clone_failed",
-                extra={
-                    "event": "clone_failed",
-                    "job_id": str(job.id),
-                    "error": str(exc),
-                },
+                extra={"event": "clone_failed", "task_id": req.task_id, "error": str(exc)},
             )
+            await _persist_execution_end(req.task_id, "failed", f"clone failed: {exc}", db_session_factory)
             return False, f"clone failed: {exc}"
 
-    project_name = project.name if project.name else str(job.id)[:8]
+    llm = req.llm_config or {}
+    project_name = req.task_id[:8]
 
     logger.info(
         "agent_starting",
         extra={
             "event": "agent_starting",
-            "job_id": str(job.id),
-            "work_dir": work_dir_path,
-            "project_name": project_name,
-            "llm_provider": agent_settings.get("agent.simple_crewai.llm_provider", "ollama"),
-            "llm_model": agent_settings.get("agent.simple_crewai.llm_model", "qwen2.5-coder:7b"),
-            "llm_temperature": agent_settings.get("agent.simple_crewai.llm_temperature", "0.2"),
-            "ollama_base_url": agent_settings.get("agent.simple_crewai.ollama_base_url", "http://localhost:11434"),
-            "openai_api_key_set": bool(agent_settings.get("agent.simple_crewai.openai_api_key", "")),
-            "anthropic_api_key_set": bool(agent_settings.get("agent.simple_crewai.anthropic_api_key", "")),
+            "task_id": req.task_id,
+            "work_dir": str(work_dir),
+            "llm_provider": llm.get("provider", "ollama"),
+            "llm_model": llm.get("model", "qwen2.5-coder:7b"),
         },
     )
 
-    # Resolve agent classes (retry import if module-level failed)
     try:
         AgentCls, ConfigCls = _resolve_agent_classes()
     except ImportError:
         tb = traceback.format_exc()
-        logger.error(
-            "agent_import_failed",
-            extra={"event": "agent_import_failed", "job_id": str(job.id), "traceback": tb},
-        )
-        return False, f"Failed to import simple_crewai_pair_agent: {tb}"
+        logger.error("agent_import_failed", extra={"event": "agent_import_failed", "traceback": tb})
+        error_msg = f"Failed to import simple_crewai_pair_agent: {tb}"
+        await _persist_execution_end(req.task_id, "failed", error_msg, db_session_factory)
+        return False, error_msg
 
     try:
         config = ConfigCls(
             working_directory=work_dir,
             project_name=project_name,
-            requirement=job.requirement,
-            llm_provider=agent_settings.get("agent.simple_crewai.llm_provider", "ollama"),
-            llm_model=agent_settings.get("agent.simple_crewai.llm_model", "qwen2.5-coder:7b"),
-            llm_temperature=float(agent_settings.get("agent.simple_crewai.llm_temperature", "0.2")),
-            ollama_base_url=agent_settings.get("agent.simple_crewai.ollama_base_url", "http://localhost:11434"),
-            openai_api_key=agent_settings.get("agent.simple_crewai.openai_api_key", ""),
-            anthropic_api_key=agent_settings.get("agent.simple_crewai.anthropic_api_key", ""),
+            requirement=req.requirements,
+            llm_provider=llm.get("provider", "ollama"),
+            llm_model=llm.get("model", "qwen2.5-coder:7b"),
+            llm_temperature=float(llm.get("temperature", 0.2)),
+            ollama_base_url=llm.get("ollama_base_url", "http://localhost:11434"),
+            openai_api_key=llm.get("openai_api_key") or "",
+            anthropic_api_key=llm.get("anthropic_api_key") or "",
         )
         result = AgentCls(config).run()
-
         error_msg = getattr(result, "error", None)
+
         if error_msg:
             logger.warning(
                 "agent_returned_error",
-                extra={"event": "agent_returned_error", "job_id": str(job.id), "error": error_msg},
+                extra={"event": "agent_returned_error", "task_id": req.task_id, "error": error_msg},
             )
+            await _persist_execution_end(req.task_id, "failed", str(error_msg), db_session_factory)
             return False, str(error_msg)
 
-        logger.info(
-            "agent_succeeded",
-            extra={"event": "agent_succeeded", "job_id": str(job.id)},
-        )
+        logger.info("agent_succeeded", extra={"event": "agent_succeeded", "task_id": req.task_id})
+        await _persist_execution_end(req.task_id, "completed", None, db_session_factory)
         return True, None
 
     except Exception as exc:
         tb = traceback.format_exc()
         logger.error(
             "agent_exception",
-            extra={
-                "event": "agent_exception",
-                "job_id": str(job.id),
-                "error": str(exc),
-                "traceback": tb,
-            },
+            extra={"event": "agent_exception", "task_id": req.task_id, "error": str(exc)},
         )
+        await _persist_execution_end(req.task_id, "failed", str(exc), db_session_factory)
         return False, str(exc)

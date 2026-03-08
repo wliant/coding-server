@@ -1,4 +1,5 @@
 """Git utilities for the worker: token injection and repository cloning."""
+import shutil
 from pathlib import Path
 
 import git
@@ -21,9 +22,15 @@ def clone_repository(
 ) -> None:
     """Clone git_url into to_path, optionally checking out branch.
 
-    If branch doesn't exist remotely, creates it from default branch.
-    Raises on clone failure.
+    If to_path already exists and is non-empty (e.g. from a prior aborted run),
+    it is removed before cloning. If branch doesn't exist remotely, it is
+    created from the default branch. Raises on clone failure.
     """
+    # Clear stale working directory from a prior run
+    if to_path.exists() and any(to_path.iterdir()):
+        shutil.rmtree(to_path)
+        to_path.mkdir(parents=True, exist_ok=True)
+
     authenticated_url = inject_github_token(git_url, github_token)
     if branch:
         try:

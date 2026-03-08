@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { AgentSettings } from "@/components/settings/AgentSettings";
 import { GitHubSettings } from "@/components/settings/GitHubSettings";
 import { getSettingsSettingsGet, updateSettingsSettingsPut } from "@/client/sdk.gen";
@@ -13,7 +12,6 @@ client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({
-    "agent.work.path": "",
     "agent.simple_crewai.llm_provider": "ollama",
     "agent.simple_crewai.llm_model": "qwen2.5-coder:7b",
     "agent.simple_crewai.llm_temperature": "0.2",
@@ -62,15 +60,11 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <Tabs defaultValue="general">
+      <Tabs defaultValue="agent">
         <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="agent">Agent Settings</TabsTrigger>
           <TabsTrigger value="github">GitHub</TabsTrigger>
         </TabsList>
-        <TabsContent value="general" className="mt-6">
-          <GeneralSettings initialSettings={settings} onSave={handleSave} />
-        </TabsContent>
         <TabsContent value="agent" className="mt-6">
           <AgentSettings initialSettings={settings} onSave={handleSave} />
         </TabsContent>

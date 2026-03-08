@@ -106,7 +106,8 @@ async def trigger_push(
 ) -> PushResponse:
     """Push a completed task's working directory to the remote git repository.
 
-    If git_url_override is provided, it is saved to the project before pushing.
+    If the task has an assigned worker, proxies the push request to that worker.
+    Otherwise falls back to calling git_service directly (legacy path).
 
     Raises:
         HTTPException 404: task not found
@@ -114,6 +115,8 @@ async def trigger_push(
         HTTPException 422: project has no git_url (and none provided)
         HTTPException 502: git push failed
     """
+    import httpx
+
     detail = await get_task_detail(db, task_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -132,6 +135,29 @@ async def trigger_push(
         await db.flush()
 
     effective_git_url = project.git_url
+
+    # If the task was handled by a worker, proxy push to that worker
+    if job.assigned_worker_url:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{job.assigned_worker_url}/push",
+                    json={"git_url": git_url_override},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return PushResponse(
+                    branch_name=data["branch_name"],
+                    remote_url=data["remote_url"],
+                    pushed_at=data["pushed_at"],
+                )
+        except httpx.HTTPStatusError as exc:
+            detail_msg = exc.response.text
+            raise HTTPException(status_code=502, detail=f"Worker push failed: {detail_msg}") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Worker push failed: {exc}") from exc
+
+    # Legacy path: push directly from API server
     if effective_git_url is None:
         raise HTTPException(
             status_code=422, detail="Project has no git_url configured"
@@ -158,6 +184,34 @@ async def trigger_push(
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Git push failed: {exc}") from exc
+
+
+async def initiate_cleanup(db: AsyncSession, task_id: uuid.UUID) -> Job:
+    """Initiate cleanup for a completed or failed task.
+
+    Sets status to 'cleaning_up'. The controller will detect this and call
+    the worker's /free endpoint to delete the working directory.
+
+    Raises:
+        HTTPException 404: task not found
+        HTTPException 409: task is not completed or failed
+    """
+    result = await db.execute(select(Job).where(Job.id == task_id))
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if job.status not in ("completed", "failed"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Can only clean up completed or failed tasks (current status: {job.status})",
+        )
+
+    job.status = "cleaning_up"
+    job.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(job)
+    return job
 
 
 async def abort_task(
