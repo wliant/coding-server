@@ -73,7 +73,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  worker:
+  simple_crewai_pair_agent:
     volumes:
       - agent_work:/agent-work
     ports:

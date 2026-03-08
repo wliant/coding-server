@@ -66,9 +66,9 @@ tasks:
       - docker compose -f compose.yaml -f compose.dev.yaml exec api python -m pytest tests/ -p no:cacheprovider
 
   test-worker:
-    desc: Run worker pytest suite (requires dev environment running)
+    desc: Run simple_crewai_pair_agent pytest suite (requires dev environment running)
     cmds:
-      - docker compose -f compose.yaml -f compose.dev.yaml exec worker python -m pytest tests/ -p no:cacheprovider
+      - docker compose -f compose.yaml -f compose.dev.yaml exec simple_crewai_pair_agent python -m pytest tests/ -p no:cacheprovider
 
   test-tools:
     desc: Run tools pytest suite (requires dev environment running)

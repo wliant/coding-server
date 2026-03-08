@@ -106,7 +106,7 @@ services:
       timeout: 5s
       retries: 5
 
-  worker:
+  simple_crewai_pair_agent:
     build:
       context: ./agents/simple_crewai_pair_agent
     expose:

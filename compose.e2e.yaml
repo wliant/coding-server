@@ -23,7 +23,7 @@ services:
     env_file:
       - .env.e2e
 
-  worker:
+  simple_crewai_pair_agent:
     ports:
       - "${WORKER_PORT:-8101}:8001"
     env_file:
@@ -40,7 +40,7 @@ services:
       context: ./web/tests/e2e
     environment:
       API_URL: http://api:8000
-      WORKER_URL: http://worker:8001
+      WORKER_URL: http://simple_crewai_pair_agent:8001
       TOOLS_URL: http://tools:8002
       BASE_URL: http://web:3000
     networks:
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
-      worker:
+      simple_crewai_pair_agent:
         condition: service_healthy
       tools:
         condition: service_healthy
@@ -65,7 +65,7 @@ services:
     environment:
       BASE_URL: http://web:3000
       API_URL: http://api:8000
-      WORKER_URL: http://worker:8001
+      WORKER_URL: http://simple_crewai_pair_agent:8001
       TOOLS_URL: http://tools:8002
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/madm
       COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-madm_e2e}
@@ -76,7 +76,7 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
-      worker:
+      simple_crewai_pair_agent:
         condition: service_healthy
       tools:
         condition: service_healthy
