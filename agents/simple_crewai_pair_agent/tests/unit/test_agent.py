@@ -77,11 +77,12 @@ def test_coding_task_description_contains_working_directory(fake_llm, tmp_path):
     assert str(tmp_path) in task.description
 
 
-def test_coding_task_writer_configured_with_working_directory(fake_llm, tmp_path):
+def test_coding_task_working_directory_in_description(fake_llm, tmp_path):
+    # FileWriterTool no longer accepts directory at construction time;
+    # the working directory is communicated to the agent via task description.
     agent = make_coder_agent(llm=fake_llm)
     task = make_coding_task(agent=agent, working_directory=tmp_path)
-    writer = next(t for t in task.tools if isinstance(t, FileWriterTool))
-    assert writer.directory == str(tmp_path)
+    assert str(tmp_path) in task.description
 
 
 def test_review_task_has_file_reader_tool(fake_llm, tmp_path):

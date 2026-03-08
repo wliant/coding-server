@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from worker.config import settings
 from worker.registration import register_with_controller, start_heartbeat_loop
-from worker.routes import get_current_state, make_router
+from worker.routes import get_current_state, make_router, _state
 
 
 def _configure_logging() -> None:
@@ -61,12 +61,52 @@ def _run_migrations() -> None:
     logger.info("worker_migrations_applied", extra={"event": "worker_migrations_applied"})
 
 
+async def _restore_state_from_db(session_factory) -> None:
+    """Restore _state from the most recent completed WorkExecution.
+
+    Called at startup to handle worker container restarts gracefully — agent-written
+    files survive on the named volume, so restoring state lets push requests work
+    after a restart.  The next heartbeat will update assigned_worker_url in the main
+    DB so the API can route future push requests to this (new) container.
+    """
+    from sqlalchemy import select
+    from worker.models import WorkExecution
+
+    try:
+        async with session_factory() as db:
+            result = await db.execute(
+                select(WorkExecution)
+                .where(WorkExecution.status == "completed")
+                .order_by(WorkExecution.completed_at.desc())
+                .limit(1)
+            )
+            execution = result.scalar_one_or_none()
+            if execution:
+                _state.status = "completed"
+                _state.task_id = str(execution.task_id)
+                _state.work_dir_path = execution.work_dir_path
+                logger.info(
+                    "state_restored",
+                    extra={
+                        "event": "state_restored",
+                        "task_id": str(execution.task_id),
+                        "work_dir_path": execution.work_dir_path,
+                    },
+                )
+    except Exception as exc:
+        logger.warning("state_restore_failed", extra={"error": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Run worker DB migrations before accepting connections
     await asyncio.to_thread(_run_migrations)
 
     engine = create_async_engine(settings.DATABASE_URL)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    # Restore last-completed-task state so push requests work after a restart
+    await _restore_state_from_db(session_factory)
 
     worker_url = _get_worker_url()
 

@@ -13,8 +13,8 @@ def make_coding_task(agent: Agent, working_directory: Path) -> Task:
     FileWriterTool and may read it back with FileReaderTool. No output_file
     is used; all file I/O goes through the configured tools.
     """
-    writer = FileWriterTool(directory=str(working_directory))
-    reader = FileReadTool(directory=str(working_directory))
+    writer = FileWriterTool()
+    reader = FileReadTool()
     return Task(
         description=(
             "Implement the following requirement in Python:\n\n"
@@ -41,7 +41,7 @@ def make_review_task(agent: Agent, coding_task: Task, working_directory: Path) -
     The agent uses FileReaderTool to read the file written by the Coder
     (filename is in the Coder's output via context), then produces a review.
     """
-    reader = FileReadTool(directory=str(working_directory))
+    reader = FileReadTool()
     return Task(
         description=(
             "The Coder agent has written a Python implementation to the working "

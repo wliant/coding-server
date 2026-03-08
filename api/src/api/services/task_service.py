@@ -139,10 +139,14 @@ async def trigger_push(
     # If the task was handled by a worker, proxy push to that worker
     if job.assigned_worker_url:
         try:
+            # Always re-fetch the token from settings so push works even after a
+            # worker restart (in-memory token is lost on restart)
+            push_settings = await setting_service.get_settings(db)
+            github_token = push_settings.get("github.token") or None
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(
                     f"{job.assigned_worker_url}/push",
-                    json={"git_url": git_url_override},
+                    json={"git_url": git_url_override, "github_token": github_token},
                 )
                 resp.raise_for_status()
                 data = resp.json()

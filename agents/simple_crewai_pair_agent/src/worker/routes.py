@@ -65,6 +65,7 @@ class WorkerStatusResponse(BaseModel):
 
 class PushRequest(BaseModel):
     git_url: str | None = None
+    github_token: str | None = None
 
 
 class PushResponse(BaseModel):
@@ -133,7 +134,9 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
 
         try:
             from worker.git_utils import inject_github_token
-            authenticated_url = inject_github_token(effective_git_url, _state.github_token or "")
+            # req.github_token takes precedence (API re-fetches from settings on each push)
+            token = req.github_token or _state.github_token or ""
+            authenticated_url = inject_github_token(effective_git_url, token)
             branch_name, remote_url = await asyncio.to_thread(
                 _push_sync, work_dir, authenticated_url
             )
@@ -179,15 +182,46 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
 
 
 def _push_sync(work_dir: str, authenticated_url: str) -> tuple[str, str]:
-    """Synchronous git push — runs in executor thread."""
-    import git as gitpython
+    """Synchronous git push — runs in executor thread.
 
-    repo = gitpython.Repo(work_dir)
-    # Use the current branch name
+    Handles two cases:
+    - work_dir IS a git repo (cloned at task start): stages uncommitted changes, commits if
+      any, then pushes.
+    - work_dir is NOT a git repo (no git_url at task start): initialises a new repo, stages
+      all agent-written files, creates an initial commit, then pushes.
+    """
+    import git as gitpython
+    from git import Actor
+
+    author = Actor("Coding Agent", "agent@coding-machine.local")
+
+    try:
+        repo = gitpython.Repo(work_dir)
+    except gitpython.exc.InvalidGitRepositoryError:
+        repo = gitpython.Repo.init(work_dir)
+
+    # Stage all new/modified/deleted files
+    repo.git.add(A=True)
+
+    # Commit when there are no commits yet (fresh init) or the index differs from HEAD.
+    # Short-circuit: check head.is_valid() first so we never call index.diff("HEAD") on a
+    # repo with no commits (which would raise BadObject).
+    needs_commit = not repo.head.is_valid() or bool(repo.index.diff("HEAD"))
+    if needs_commit:
+        repo.index.commit(
+            "feat: implementation by coding agent",
+            author=author,
+            committer=author,
+        )
+
     branch_name = repo.active_branch.name
-    origin = repo.remote(name="origin")
-    origin.set_url(authenticated_url)
-    origin.push(refspec=f"{branch_name}:{branch_name}")
+
+    if "origin" not in [r.name for r in repo.remotes]:
+        repo.create_remote("origin", authenticated_url)
+    else:
+        repo.remote("origin").set_url(authenticated_url)
+
+    repo.remote("origin").push(refspec=f"{branch_name}:{branch_name}")
     return branch_name, authenticated_url
 
 
