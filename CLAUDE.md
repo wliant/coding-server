@@ -74,3 +74,6 @@ cd web && npx tsc --noEmit
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Recent Changes
+- 009-agent-controller-worker: Added Python 3.12 (controller, worker); TypeScript / Node.js 20 (web) + FastAPI 0.115+, SQLAlchemy 2 async, asyncpg, pydantic-settings, python-json-logger, httpx (controller and worker); simple-crewai-pair-agent, gitpython (worker); Next.js 15, React 19, Tailwind CSS, shadcn/ui, @hey-api/client-fetch (web)

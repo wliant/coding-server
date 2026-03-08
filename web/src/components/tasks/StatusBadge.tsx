@@ -26,6 +26,14 @@ const statusConfig: Record<
     label: "Failed",
     className: "bg-red-100 text-red-800",
   },
+  cleaning_up: {
+    label: "Cleaning Up",
+    className: "bg-orange-100 text-orange-800",
+  },
+  cleaned: {
+    label: "Cleaned",
+    className: "bg-gray-100 text-gray-600",
+  },
 };
 
 interface StatusBadgeProps {

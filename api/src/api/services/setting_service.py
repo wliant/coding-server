@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models.setting import Setting
 
 ALLOWED_KEYS: set[str] = {
-    "agent.work.path",
     "agent.simple_crewai.llm_provider",
     "agent.simple_crewai.llm_model",
     "agent.simple_crewai.llm_temperature",
@@ -19,7 +18,6 @@ ALLOWED_KEYS: set[str] = {
 }
 
 DEFAULTS: dict[str, str] = {
-    "agent.work.path": "",
     "agent.simple_crewai.llm_provider": "ollama",
     "agent.simple_crewai.llm_model": "qwen2.5-coder:7b",
     "agent.simple_crewai.llm_temperature": "0.2",

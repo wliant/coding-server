@@ -39,6 +39,8 @@ class Job(Base):
         UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True
     )
     branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assigned_worker_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assigned_worker_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class WorkDirectory(Base):

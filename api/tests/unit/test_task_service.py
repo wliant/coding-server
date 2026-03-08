@@ -360,3 +360,80 @@ async def test_create_task_branch_defaults_to_none(db_session):
     job, project, agent = await task_service.create_task(db_session, req)
 
     assert job.branch is None
+
+
+# --- initiate_cleanup tests ---
+
+
+async def test_initiate_cleanup_on_completed_sets_cleaning_up(db_session):
+    """initiate_cleanup on completed job → status becomes 'cleaning_up'."""
+    project = Project(name=None, source_type="new", status="active")
+    db_session.add(project)
+    await db_session.flush()
+
+    job = Job(project_id=project.id, requirement="Some task", status="completed")
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    result = await task_service.initiate_cleanup(db_session, job.id)
+
+    assert result.status == "cleaning_up"
+
+
+async def test_initiate_cleanup_on_failed_sets_cleaning_up(db_session):
+    """initiate_cleanup on failed job → status becomes 'cleaning_up'."""
+    project = Project(name=None, source_type="new", status="active")
+    db_session.add(project)
+    await db_session.flush()
+
+    job = Job(project_id=project.id, requirement="Some task", status="failed")
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    result = await task_service.initiate_cleanup(db_session, job.id)
+
+    assert result.status == "cleaning_up"
+
+
+async def test_initiate_cleanup_on_in_progress_raises_409(db_session):
+    """initiate_cleanup on in_progress job raises 409."""
+    project = Project(name=None, source_type="new", status="active")
+    db_session.add(project)
+    await db_session.flush()
+
+    job = Job(project_id=project.id, requirement="Some task", status="in_progress")
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await task_service.initiate_cleanup(db_session, job.id)
+
+    assert exc_info.value.status_code == 409
+
+
+async def test_initiate_cleanup_on_pending_raises_409(db_session):
+    """initiate_cleanup on pending job raises 409."""
+    project = Project(name=None, source_type="new", status="active")
+    db_session.add(project)
+    await db_session.flush()
+
+    job = Job(project_id=project.id, requirement="Some task", status="pending")
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await task_service.initiate_cleanup(db_session, job.id)
+
+    assert exc_info.value.status_code == 409
+
+
+async def test_initiate_cleanup_on_nonexistent_task_raises_404(db_session):
+    """initiate_cleanup on unknown task_id raises 404."""
+    with pytest.raises(HTTPException) as exc_info:
+        await task_service.initiate_cleanup(db_session, uuid.uuid4())
+
+    assert exc_info.value.status_code == 404

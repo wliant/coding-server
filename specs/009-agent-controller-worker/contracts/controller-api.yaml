@@ -1,0 +1,187 @@
+openapi: "3.1.0"
+info:
+  title: "Agent Controller API"
+  version: "1.0.0"
+  description: |
+    Internal API for the Controller service. Consumed by:
+    - Worker services (register, heartbeat, liveness)
+    - Main API (GET /workers proxy)
+    Not exposed to the browser directly.
+
+servers:
+  - url: "http://controller:8002"
+    description: "Internal Docker network"
+
+paths:
+  /health:
+    get:
+      operationId: controllerHealth
+      summary: Controller liveness check
+      description: Used by workers to verify the Controller is reachable before registering.
+      responses:
+        "200":
+          description: Controller is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /workers/register:
+    post:
+      operationId: registerWorker
+      summary: Register a worker with the Controller
+      description: |
+        Called by workers on startup (with retry until success).
+        Returns a unique worker_id assigned by the Controller.
+        If a worker with the same worker_url already exists (e.g., restart),
+        the existing registration is replaced with a fresh "free" record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkerRegistrationRequest"
+      responses:
+        "200":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerRegistrationResponse"
+        "422":
+          description: Validation error (missing agent_type or worker_url)
+
+  /workers/{worker_id}/heartbeat:
+    post:
+      operationId: workerHeartbeat
+      summary: Worker liveness and status report
+      description: |
+        Workers call this endpoint periodically (default: every 15s).
+        Serves dual purpose:
+        1. Proof of life — updates last_heartbeat_at.
+        2. Status report — if status is "completed" or "failed", the Controller
+           updates the corresponding job in the main database and frees the worker.
+      parameters:
+        - name: worker_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HeartbeatRequest"
+      responses:
+        "200":
+          description: Heartbeat acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeartbeatResponse"
+        "404":
+          description: Worker ID not found (re-registration required)
+
+  /workers:
+    get:
+      operationId: listWorkers
+      summary: List all registered workers and their statuses
+      description: |
+        Returns all currently registered workers with their status, agent type,
+        last heartbeat time, and current task assignment.
+        Consumed by the main API's GET /workers proxy endpoint.
+      responses:
+        "200":
+          description: List of worker records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkerStatus"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+
+    WorkerRegistrationRequest:
+      type: object
+      required: [agent_type, worker_url]
+      properties:
+        agent_type:
+          type: string
+          description: The agent type this worker can execute (e.g. "simple_crewai_pair_agent")
+          example: simple_crewai_pair_agent
+        worker_url:
+          type: string
+          description: Base URL of the worker's own API (reachable from Controller)
+          example: "http://worker-1:8001"
+
+    WorkerRegistrationResponse:
+      type: object
+      required: [worker_id]
+      properties:
+        worker_id:
+          type: string
+          description: UUID assigned by the Controller; must be included in all subsequent calls
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    HeartbeatRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [free, in_progress, completed, failed]
+          description: Current worker status
+        task_id:
+          type: string
+          nullable: true
+          description: Current task ID (required when status is in_progress, completed, or failed)
+        error_message:
+          type: string
+          nullable: true
+          description: Error detail (required when status is failed)
+
+    HeartbeatResponse:
+      type: object
+      required: [acknowledged]
+      properties:
+        acknowledged:
+          type: boolean
+          example: true
+
+    WorkerStatus:
+      type: object
+      required: [worker_id, agent_type, worker_url, status, registered_at, last_heartbeat_at]
+      properties:
+        worker_id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        agent_type:
+          type: string
+          example: simple_crewai_pair_agent
+        worker_url:
+          type: string
+          example: "http://worker-1:8001"
+        status:
+          type: string
+          enum: [free, in_progress, completed, failed, unreachable]
+        current_task_id:
+          type: string
+          nullable: true
+          example: null
+        registered_at:
+          type: string
+          format: date-time
+        last_heartbeat_at:
+          type: string
+          format: date-time

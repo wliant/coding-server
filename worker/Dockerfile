@@ -14,6 +14,7 @@ COPY agents/simple_crewai_pair_agent/ ./agents/simple_crewai_pair_agent/
 # Install worker package from its own directory so ../agents/... resolves correctly
 COPY worker/pyproject.toml ./worker/
 COPY worker/src/ ./worker/src/
+COPY worker/alembic/ ./worker/alembic/
 WORKDIR /app/worker
 RUN pip install --no-cache-dir ".[dev]"
 WORKDIR /app
@@ -21,4 +22,4 @@ WORKDIR /app
 USER appuser
 EXPOSE 8001
 
-CMD ["uvicorn", "worker.worker:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "worker.app:app", "--host", "0.0.0.0", "--port", "8001"]

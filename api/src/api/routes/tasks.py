@@ -11,6 +11,7 @@ from api.models.job import Job, WorkDirectory
 from api.models.project import Project
 from api.schemas.agent import AgentSummary
 from api.schemas.task import (
+    CleanupResponse,
     CreateTaskRequest,
     ProjectSummary,
     ProjectSummaryWithGitUrl,
@@ -108,6 +109,12 @@ async def push_task_to_remote(
 ):
     git_url_override = body.git_url if body else None
     return await task_service.trigger_push(db, task_id, git_url_override=git_url_override)
+
+
+@router.post("/{task_id}/cleanup", response_model=CleanupResponse)
+async def cleanup_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    job = await task_service.initiate_cleanup(db, task_id)
+    return CleanupResponse(task_id=job.id, status=TaskStatus(job.status))
 
 
 @router.patch("/{task_id}", response_model=TaskResponse)

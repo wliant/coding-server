@@ -18,6 +18,7 @@ from api.routes.health import router as health_router
 from api.routes.projects import router as projects_router
 from api.routes.settings import router as settings_router
 from api.routes.tasks import router as tasks_router
+from api.routes.workers import router as workers_router
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -106,3 +107,4 @@ app.include_router(agents_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
 app.include_router(settings_router)
+app.include_router(workers_router)

@@ -13,6 +13,8 @@ class TaskStatus(str, Enum):
     in_progress = "in_progress"
     completed = "completed"
     failed = "failed"
+    cleaning_up = "cleaning_up"
+    cleaned = "cleaned"
 
 
 class ProjectType(str, Enum):
@@ -67,8 +69,24 @@ class TaskDetailResponse(BaseModel):
     work_directory_path: str | None = None
     elapsed_seconds: int | None = None
     branch: str | None = None
+    assigned_worker_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class CleanupResponse(BaseModel):
+    task_id: uuid.UUID
+    status: str = "cleaning_up"
+
+
+class WorkerStatus(BaseModel):
+    worker_id: str
+    agent_type: str
+    worker_url: str
+    status: str
+    current_task_id: str | None = None
+    registered_at: datetime
+    last_heartbeat_at: datetime
 
 
 class PushResponse(BaseModel):

@@ -1,0 +1,252 @@
+openapi: "3.1.0"
+info:
+  title: "Agent Worker API"
+  version: "1.0.0"
+  description: |
+    Internal API for each Worker service. Consumed exclusively by the Controller.
+    Not exposed to the browser or main API directly.
+    Each worker instance runs this API on its configured port.
+
+servers:
+  - url: "http://worker-1:8001"
+    description: "Example worker instance (internal Docker network)"
+
+paths:
+  /health:
+    get:
+      operationId: workerHealth
+      summary: Worker liveness check
+      responses:
+        "200":
+          description: Worker is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /work:
+    post:
+      operationId: issueWork
+      summary: Issue a task to the worker
+      description: |
+        Called by the Controller to assign a task.
+        The worker responds immediately (202 Accepted) and executes asynchronously.
+        Completion is reported via heartbeat to the Controller.
+        Returns 409 if the worker is not in "free" status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkRequest"
+      responses:
+        "202":
+          description: Task accepted; execution started asynchronously
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkAcceptedResponse"
+        "409":
+          description: Worker is not free (already executing a task)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error in request body
+
+  /status:
+    get:
+      operationId: getWorkerStatus
+      summary: Get current worker status
+      description: Returns the worker's current execution status and task ID.
+      responses:
+        "200":
+          description: Current worker status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerStatusResponse"
+
+  /push:
+    post:
+      operationId: pushToRemote
+      summary: Push working directory to remote git repository
+      description: |
+        Pushes the working directory contents to the configured remote.
+        Only valid when worker status is "completed".
+        Uses the github_token provided during task assignment for HTTPS auth.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRequest"
+      responses:
+        "200":
+          description: Push successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "409":
+          description: Worker is not in "completed" state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Git push failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /free:
+    post:
+      operationId: freeWorker
+      summary: Clean up working directory and free the worker
+      description: |
+        Called by the Controller when a task reaches "cleaning_up" status.
+        Worker deletes its working directory and resets status to "free".
+        If working directory does not exist, responds with success (idempotent).
+        Returns 409 if worker is currently "in_progress".
+      responses:
+        "200":
+          description: Worker freed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreeResponse"
+        "409":
+          description: Worker is in_progress; cannot free mid-execution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Working directory deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    WorkRequest:
+      type: object
+      required: [task_id, requirements, agent_type, llm_config]
+      properties:
+        task_id:
+          type: string
+          description: UUID of the job in the main database
+        requirements:
+          type: string
+          description: The task requirements text
+        agent_type:
+          type: string
+          description: Which agent to invoke (e.g. "simple_crewai_pair_agent")
+        git_url:
+          type: string
+          nullable: true
+          description: Repository to clone (null for new projects)
+        branch:
+          type: string
+          nullable: true
+          description: Branch to check out after cloning
+        github_token:
+          type: string
+          nullable: true
+          description: GitHub PAT for HTTPS clone/push auth (must not be logged)
+        llm_config:
+          $ref: "#/components/schemas/LLMConfig"
+
+    LLMConfig:
+      type: object
+      required: [provider, model]
+      properties:
+        provider:
+          type: string
+          enum: [ollama, openai, anthropic]
+        model:
+          type: string
+          example: qwen2.5-coder:7b
+        temperature:
+          type: number
+          format: float
+          default: 0.2
+        ollama_base_url:
+          type: string
+          nullable: true
+          example: "http://localhost:11434"
+        openai_api_key:
+          type: string
+          nullable: true
+        anthropic_api_key:
+          type: string
+          nullable: true
+
+    WorkAcceptedResponse:
+      type: object
+      required: [accepted, task_id]
+      properties:
+        accepted:
+          type: boolean
+          example: true
+        task_id:
+          type: string
+
+    WorkerStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [free, in_progress, completed, failed]
+        task_id:
+          type: string
+          nullable: true
+
+    PushRequest:
+      type: object
+      properties:
+        git_url:
+          type: string
+          nullable: true
+          description: Override git URL for push (uses task's git_url if not provided)
+
+    PushResponse:
+      type: object
+      required: [branch_name, remote_url, pushed_at]
+      properties:
+        branch_name:
+          type: string
+          example: "task/a1b2c3d4"
+        remote_url:
+          type: string
+        pushed_at:
+          type: string
+          format: date-time
+
+    FreeResponse:
+      type: object
+      required: [freed]
+      properties:
+        freed:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
