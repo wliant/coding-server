@@ -262,8 +262,14 @@ async def process_task_completion(
     status: str,
     error_message: str | None,
 ) -> None:
-    """Update job in DB when worker reports completion via heartbeat."""
+    """Update job in DB when worker reports completion via heartbeat.
+
+    Also restores assigned_worker_url/id in case they were cleared by a
+    transient reap cycle while the agent was running.
+    """
     now = datetime.now(timezone.utc)
+    worker_rec = await registry.get(worker_id)
+    worker_url = worker_rec.worker_url if worker_rec else None
     await db.execute(
         update(Job)
         .where(Job.id == uuid.UUID(task_id))
@@ -271,6 +277,8 @@ async def process_task_completion(
             status=status,
             completed_at=now,
             error_message=error_message,
+            assigned_worker_id=worker_id,
+            assigned_worker_url=worker_url,
             updated_at=now,
         )
     )
