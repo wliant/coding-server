@@ -63,3 +63,6 @@ web/src/client/
 
 # Taskfile cache
 .task/
+
+# Local machine-specific workspace (IDE data, personal scripts)
+.local/
