@@ -1,9 +1,11 @@
 """In-memory worker registry for the Controller."""
 import asyncio
-import uuid
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 
 WorkerStatus = Literal["free", "in_progress", "completed", "failed", "unreachable"]
@@ -25,15 +27,26 @@ class WorkerRegistry:
         self._lock = asyncio.Lock()
         self._workers: dict[str, WorkerRecord] = {}
 
-    async def register(self, agent_type: str, worker_url: str) -> str:
-        """Register a worker (or re-register on restart). Returns assigned worker_id."""
+    async def register(self, worker_id: str, agent_type: str, worker_url: str) -> str:
+        """Register a worker using the worker-proposed ID.
+
+        Deduplicates by both URL (handles IP change) and worker_id (handles restart).
+        Returns the worker_id unchanged.
+        """
         async with self._lock:
-            # Replace any existing record for the same URL (worker restart)
+            # Remove any existing record with the same URL or same worker_id
             for wid, rec in list(self._workers.items()):
-                if rec.worker_url == worker_url:
+                if rec.worker_url == worker_url or wid == worker_id:
+                    if wid != worker_id:
+                        logger.warning(
+                            "worker_id_collision",
+                            extra={
+                                "event": "worker_id_collision",
+                                "new_worker_id": worker_id,
+                                "existing_worker_id": wid,
+                            },
+                        )
                     del self._workers[wid]
-                    break
-            worker_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
             self._workers[worker_id] = WorkerRecord(
                 worker_id=worker_id,

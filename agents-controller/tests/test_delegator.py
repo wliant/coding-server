@@ -71,7 +71,7 @@ def _make_job(
 async def test_reap_marks_stale_worker_unreachable():
     registry = WorkerRegistry()
     old_time = datetime.now(timezone.utc) - timedelta(seconds=120)
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     # Override last_heartbeat_at to be stale
     registry._workers[worker_id].last_heartbeat_at = old_time
 
@@ -89,7 +89,7 @@ async def test_reap_resets_in_progress_task_to_pending():
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
     old_time = datetime.now(timezone.utc) - timedelta(seconds=120)
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     registry._workers[worker_id].last_heartbeat_at = old_time
     registry._workers[worker_id].status = "in_progress"
     registry._workers[worker_id].current_task_id = task_id
@@ -108,7 +108,7 @@ async def test_reap_resets_in_progress_task_to_pending():
 @pytest.mark.asyncio
 async def test_reap_does_not_touch_recently_heartbeating_workers():
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     # Worker heartbeated just now (default) — not stale
 
     db = AsyncMock(spec=AsyncSession)
@@ -130,7 +130,7 @@ async def test_reap_does_not_touch_recently_heartbeating_workers():
 async def test_renew_leases_extends_in_progress_worker_lease():
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     await registry.assign_task(worker_id, task_id)
 
     db = AsyncMock(spec=AsyncSession)
@@ -146,7 +146,7 @@ async def test_renew_leases_extends_in_progress_worker_lease():
 @pytest.mark.asyncio
 async def test_renew_leases_skips_free_workers():
     registry = WorkerRegistry()
-    await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     # Worker stays free (no assign_task)
 
     db = AsyncMock(spec=AsyncSession)
@@ -167,7 +167,7 @@ async def test_renew_leases_skips_free_workers():
 @pytest.mark.asyncio
 async def test_delegate_claims_task_and_posts_to_worker():
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
 
     job, project, agent = _make_job(status="pending")
 
@@ -203,7 +203,7 @@ async def test_delegate_claims_task_and_posts_to_worker():
 async def test_delegate_skips_when_no_free_worker():
     registry = WorkerRegistry()
     # Register a worker but mark it in_progress
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     await registry.assign_task(worker_id, str(uuid.uuid4()))
 
     job, project, agent = _make_job(status="pending")
@@ -230,7 +230,7 @@ async def test_delegate_skips_when_no_free_worker():
 @pytest.mark.asyncio
 async def test_delegate_rolls_back_claim_when_worker_post_fails():
     registry = WorkerRegistry()
-    await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
 
     job, project, agent = _make_job(status="pending")
 
@@ -265,15 +265,17 @@ async def test_delegate_rolls_back_claim_when_worker_post_fails():
 @pytest.mark.asyncio
 async def test_process_task_completion_updates_db_on_completed():
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
     db = AsyncMock(spec=AsyncSession)
-    db.execute = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.fetchone.return_value = (uuid.UUID(task_id),)
+    db.execute = AsyncMock(return_value=mock_result)
     db.commit = AsyncMock()
 
-    await process_task_completion(
+    updated = await process_task_completion(
         db=db,
         registry=registry,
         worker_id=worker_id,
@@ -282,6 +284,7 @@ async def test_process_task_completion_updates_db_on_completed():
         error_message=None,
     )
 
+    assert updated is True
     db.execute.assert_called_once()
     db.commit.assert_called_once()
 
@@ -289,15 +292,17 @@ async def test_process_task_completion_updates_db_on_completed():
 @pytest.mark.asyncio
 async def test_process_task_completion_updates_db_on_failed():
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
     db = AsyncMock(spec=AsyncSession)
-    db.execute = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.fetchone.return_value = (uuid.UUID(task_id),)
+    db.execute = AsyncMock(return_value=mock_result)
     db.commit = AsyncMock()
 
-    await process_task_completion(
+    updated = await process_task_completion(
         db=db,
         registry=registry,
         worker_id=worker_id,
@@ -306,6 +311,34 @@ async def test_process_task_completion_updates_db_on_failed():
         error_message="Agent crashed",
     )
 
+    assert updated is True
+    db.execute.assert_called_once()
+    db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_process_task_completion_returns_false_when_job_not_in_progress():
+    """Returns False when the job is already pending (reaper reset it)."""
+    registry = WorkerRegistry()
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
+    task_id = str(uuid.uuid4())
+
+    db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_result.fetchone.return_value = None  # 0 rows updated
+    db.execute = AsyncMock(return_value=mock_result)
+    db.commit = AsyncMock()
+
+    updated = await process_task_completion(
+        db=db,
+        registry=registry,
+        worker_id=worker_id,
+        task_id=task_id,
+        status="failed",
+        error_message="Agent finished but job was already reset",
+    )
+
+    assert updated is False
     db.execute.assert_called_once()
     db.commit.assert_called_once()
 

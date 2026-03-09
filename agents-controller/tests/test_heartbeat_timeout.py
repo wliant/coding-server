@@ -14,7 +14,7 @@ from controller.registry import WorkerRegistry
 async def test_reap_marks_stale_worker_as_unreachable():
     """Worker with heartbeat older than timeout is marked unreachable."""
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
 
     # Force heartbeat to be stale
     registry._workers[worker_id].last_heartbeat_at = (
@@ -37,7 +37,7 @@ async def test_reap_resets_associated_job_to_pending():
     """Job assigned to stale worker is reset to pending."""
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     registry._workers[worker_id].last_heartbeat_at = (
         datetime.now(timezone.utc) - timedelta(seconds=120)
     )
@@ -61,7 +61,7 @@ async def test_reap_clears_assigned_worker_fields_from_job():
     import re
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     registry._workers[worker_id].last_heartbeat_at = (
         datetime.now(timezone.utc) - timedelta(seconds=120)
     )
@@ -86,7 +86,7 @@ async def test_reap_clears_assigned_worker_fields_from_job():
 async def test_reap_does_not_touch_worker_with_fresh_heartbeat():
     """Worker with recent heartbeat is not marked unreachable."""
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     # Heartbeat is fresh (registered just now)
 
     db = AsyncMock(spec=AsyncSession)
@@ -104,7 +104,7 @@ async def test_reap_does_not_touch_worker_with_fresh_heartbeat():
 async def test_reap_skips_already_unreachable_worker():
     """Already unreachable workers are not re-reaped."""
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     registry._workers[worker_id].status = "unreachable"
     registry._workers[worker_id].last_heartbeat_at = (
         datetime.now(timezone.utc) - timedelta(seconds=200)

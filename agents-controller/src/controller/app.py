@@ -38,9 +38,9 @@ def create_app(
     if on_completion_callback is None:
         async def on_completion_callback(
             worker_id: str, task_id: str, status: str, error_message: str | None
-        ) -> None:
+        ) -> bool:
             async with session_factory() as db:
-                await process_task_completion(db, registry, worker_id, task_id, status, error_message)
+                return await process_task_completion(db, registry, worker_id, task_id, status, error_message)
             # Do NOT set_free here — worker stays in completed/failed state until user triggers
             # "Clean Up", at which point the controller calls /free on the worker.
 

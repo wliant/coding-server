@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     WORKER_PORT: int = 8001
     HEARTBEAT_INTERVAL_SECONDS: int = 15
     TOOLS_GATEWAY_URL: str = "http://tools:8002"
+    WORKER_ID: str = ""  # Empty = use hostname as default
 
     model_config = SettingsConfigDict(env_file=".env")
 

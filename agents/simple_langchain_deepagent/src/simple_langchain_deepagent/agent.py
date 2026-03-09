@@ -14,7 +14,10 @@ SYSTEM_PROMPT = (
     "You are a senior software developer. "
     "Implement the requested feature by writing code to files using the available tools. "
     "Think step by step: plan the solution, write the code, verify your implementation, "
-    "then summarise what you did."
+    "then summarise what you did. "
+    "IMPORTANT: Your working directory is already set correctly. "
+    "Always use relative paths (e.g. 'src/main.py', 'README.md') — never absolute paths "
+    "like /app, /tmp, or any path outside your working directory."
 )
 
 
@@ -80,7 +83,10 @@ class DeepAgent:
         )
 
         task_prompt = (
-            f"Project: {config.project_name}\n\nRequirement:\n{config.requirement}"
+            f"Project: {config.project_name}\n\n"
+            f"Working directory: {config.working_directory}\n\n"
+            f"Requirement:\n{config.requirement}\n\n"
+            f"Reminder: create all files using relative paths inside {config.working_directory}."
         )
 
         logger.info(

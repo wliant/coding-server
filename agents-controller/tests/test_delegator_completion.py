@@ -13,7 +13,7 @@ from controller.registry import WorkerRegistry
 async def test_completion_updates_db_status_to_completed():
     """process_task_completion sets job status to 'completed' in DB."""
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
@@ -38,7 +38,7 @@ async def test_completion_updates_db_status_to_completed():
 async def test_completion_updates_db_status_to_failed():
     """process_task_completion sets job status to 'failed' with error_message in DB."""
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
@@ -77,7 +77,7 @@ async def test_heartbeat_with_completed_status_triggers_completion():
         completion_calls.append(kwargs)
 
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
@@ -107,7 +107,7 @@ async def test_heartbeat_with_failed_status_triggers_completion():
         completion_calls.append(kwargs)
 
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
     await registry.assign_task(worker_id, task_id)
 
@@ -136,7 +136,7 @@ async def test_heartbeat_with_in_progress_status_does_not_trigger_completion():
         completion_calls.append(kwargs)
 
     registry = WorkerRegistry()
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     task_id = str(uuid.uuid4())
 
     app = create_app(registry=registry, on_completion_callback=on_completion)

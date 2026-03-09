@@ -36,6 +36,17 @@ def get_current_state() -> dict:
     }
 
 
+def _set_state_free() -> None:
+    """Reset state to free. Only acts if worker is not actively running."""
+    if _state.status != "in_progress":
+        _state.status = "free"
+        _state.task_id = None
+        _state.error_message = None
+        _state.git_url = None
+        _state.github_token = None
+        _state.work_dir_path = None
+
+
 class LLMConfig(BaseModel):
     provider: str
     model: str

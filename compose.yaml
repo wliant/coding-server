@@ -118,6 +118,7 @@ services:
       WORK_DIR: /agent-work
       TOOLS_GATEWAY_URL: http://tools:8002
       HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-15}
+      WORKER_ID: ${WORKER_ID:-}
     volumes:
       - agent_work:/agent-work
     networks:
@@ -146,6 +147,7 @@ services:
       WORKER_PORT: "8004"
       TOOLS_GATEWAY_URL: http://tools:8002
       HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-15}
+      WORKER_ID: ${LANGCHAIN_WORKER_ID:-}
     volumes:
       - agent_work:/agent-work
     networks:

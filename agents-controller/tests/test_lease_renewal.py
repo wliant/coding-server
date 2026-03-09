@@ -14,7 +14,7 @@ async def test_renew_extends_lease_for_in_progress_worker():
     """in_progress worker with active task gets its lease extended."""
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     await registry.assign_task(worker_id, task_id)
 
     db = AsyncMock(spec=AsyncSession)
@@ -37,7 +37,7 @@ async def test_renew_extends_lease_for_in_progress_worker():
 async def test_renew_skips_free_worker():
     """Free worker has no active task, no DB update needed."""
     registry = WorkerRegistry()
-    await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     # Worker stays free, no assign_task
 
     db = AsyncMock(spec=AsyncSession)
@@ -55,7 +55,7 @@ async def test_renew_skips_unreachable_worker():
     """Unreachable worker does not get a lease renewal."""
     registry = WorkerRegistry()
     task_id = str(uuid.uuid4())
-    worker_id = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
     await registry.assign_task(worker_id, task_id)
     # Simulate being marked unreachable
     registry._workers[worker_id].status = "unreachable"
@@ -75,8 +75,8 @@ async def test_renew_multiple_in_progress_workers():
     registry = WorkerRegistry()
     task_id_1 = str(uuid.uuid4())
     task_id_2 = str(uuid.uuid4())
-    worker_id_1 = await registry.register("simple_crewai_pair_agent", "http://worker1:8001")
-    worker_id_2 = await registry.register("simple_crewai_pair_agent", "http://worker2:8001")
+    worker_id_1 = await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
+    worker_id_2 = await registry.register("worker-2", "simple_crewai_pair_agent", "http://worker2:8001")
     await registry.assign_task(worker_id_1, task_id_1)
     await registry.assign_task(worker_id_2, task_id_2)
 

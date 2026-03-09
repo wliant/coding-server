@@ -198,7 +198,10 @@ async def run_coding_agent(
             openai_api_key=llm.get("openai_api_key") or "",
             anthropic_api_key=llm.get("anthropic_api_key") or "",
         )
-        result = AgentCls(config).run()
+        # Run in a thread so the event loop (and heartbeat task) stays responsive
+        # during the potentially long-running synchronous agent execution.
+        agent_instance = AgentCls(config)
+        result = await asyncio.to_thread(agent_instance.run)
         # DeepAgentResult has no .error field; exceptions are caught below
         summary = getattr(result, "summary", None)
 

@@ -275,18 +275,24 @@ async def process_task_completion(
     task_id: str,
     status: str,
     error_message: str | None,
-) -> None:
+) -> bool:
     """Update job in DB when worker reports completion via heartbeat.
 
     Also restores assigned_worker_url/id in case they were cleared by a
     transient reap cycle while the agent was running.
+
+    Returns True if the job was updated, False if the job was not in_progress
+    (e.g. the reaper already reset it to pending).
     """
     now = datetime.now(timezone.utc)
     worker_rec = await registry.get(worker_id)
     worker_url = worker_rec.worker_url if worker_rec else None
     result = await db.execute(
         update(Job)
-        .where(Job.id == uuid.UUID(task_id), Job.status == "in_progress")
+        .where(
+            Job.id == uuid.UUID(task_id),
+            Job.status == "in_progress",  # Never overwrite cleaning_up/cleaned/pending
+        )
         .values(
             status=status,
             completed_at=now,
@@ -304,6 +310,17 @@ async def process_task_completion(
             "task_completed" if status == "completed" else "task_failed",
             extra={"event": f"task_{status}", "task_id": task_id, "worker_id": worker_id},
         )
+    else:
+        logger.info(
+            "task_completion_ignored",
+            extra={
+                "event": "task_completion_ignored",
+                "task_id": task_id,
+                "worker_id": worker_id,
+                "status": status,
+            },
+        )
+    return updated is not None
 
 
 async def run_poll_cycle(

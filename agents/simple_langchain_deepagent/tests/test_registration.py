@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 @pytest.mark.asyncio
 async def test_register_with_controller_returns_worker_id():
-    """Successful registration returns a worker_id string."""
+    """Successful registration returns the confirmed worker_id."""
     from worker.registration import register_with_controller
 
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"worker_id": "test-worker-123"}
+    mock_response.json.return_value = {"worker_id": "my-worker"}
     mock_response.raise_for_status = MagicMock()
 
     with patch("worker.registration.httpx.AsyncClient") as MockClient:
@@ -20,12 +20,15 @@ async def test_register_with_controller_returns_worker_id():
         MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
         worker_id = await register_with_controller(
+            worker_id="my-worker",
             controller_url="http://controller:8003",
             agent_type="simple_langchain_deepagent",
             worker_url="http://simple_langchain_deepagent:8004",
         )
 
-    assert worker_id == "test-worker-123"
+    assert worker_id == "my-worker"
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json"]["worker_id"] == "my-worker"
 
 
 @pytest.mark.asyncio
@@ -36,7 +39,7 @@ async def test_register_retries_on_connection_error():
 
     success_response = MagicMock()
     success_response.status_code = 200
-    success_response.json.return_value = {"worker_id": "worker-456"}
+    success_response.json.return_value = {"worker_id": "my-worker"}
     success_response.raise_for_status = MagicMock()
 
     call_count = 0
@@ -56,10 +59,11 @@ async def test_register_retries_on_connection_error():
 
         with patch("worker.registration.asyncio.sleep", new=AsyncMock()):
             worker_id = await register_with_controller(
+                worker_id="my-worker",
                 controller_url="http://controller:8003",
                 agent_type="simple_langchain_deepagent",
                 worker_url="http://simple_langchain_deepagent:8004",
             )
 
-    assert worker_id == "worker-456"
+    assert worker_id == "my-worker"
     assert call_count == 3

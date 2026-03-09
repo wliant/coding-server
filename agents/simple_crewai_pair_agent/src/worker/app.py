@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from worker.config import settings
 from worker.registration import register_with_controller, start_heartbeat_loop
-from worker.routes import get_current_state, make_router, _state
+from worker.routes import get_current_state, make_router, _set_state_free, _state
 
 
 def _configure_logging() -> None:
@@ -64,36 +64,105 @@ def _run_migrations() -> None:
 
 
 async def _restore_state_from_db(session_factory) -> None:
-    """Restore _state from an in-progress WorkExecution on restart.
+    """Restore _state from the most recent WorkExecution on restart.
 
-    Only restores in_progress tasks (agent was running when container crashed).
-    Completed tasks are NOT restored: restoring completed state blocks the worker
-    from accepting new tasks until the old task is manually cleaned up, creating
-    a stuck-worker deadlock.
+    - in_progress: mark as failed in DB (worker crashed mid-task), restore failed state
+    - completed/failed: restore state so /push and /status work after restart
+    - no record: leave state as free
     """
-    from sqlalchemy import select
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select, update
     from worker.models import WorkExecution
 
     try:
         async with session_factory() as db:
             result = await db.execute(
                 select(WorkExecution)
-                .where(WorkExecution.status == "in_progress")
                 .order_by(WorkExecution.started_at.desc())
                 .limit(1)
             )
             execution = result.scalar_one_or_none()
-            if execution:
-                _state.status = "in_progress"
+            if execution is None:
+                return
+
+            if execution.status == "in_progress":
+                # Worker crashed while task was running — mark as failed in DB
+                now = datetime.now(timezone.utc)
+                await db.execute(
+                    update(WorkExecution)
+                    .where(WorkExecution.id == execution.id)
+                    .values(
+                        status="failed",
+                        error_message="Worker restarted while task was in progress",
+                        completed_at=now,
+                    )
+                )
+                await db.commit()
+
+                # Check if the reaper already reset the job to pending
+                from sqlalchemy import text
+                job_row = await db.execute(
+                    text("SELECT status FROM jobs WHERE id = :task_id"),
+                    {"task_id": execution.task_id},
+                )
+                job_status = (job_row.fetchone() or (None,))[0]
+
+                if job_status == "in_progress":
+                    # Reaper hasn't run yet — restore failed state so heartbeat updates job
+                    _state.status = "failed"
+                    _state.task_id = str(execution.task_id)
+                    _state.work_dir_path = execution.work_dir_path
+                    _state.error_message = "Worker restarted while task was in progress"
+                    logger.info(
+                        "state_restored_as_failed",
+                        extra={
+                            "event": "state_restored_as_failed",
+                            "task_id": str(execution.task_id),
+                            "work_dir_path": execution.work_dir_path,
+                        },
+                    )
+                else:
+                    # Reaper already reset job to pending (or job is gone) — stay free
+                    logger.info(
+                        "state_restore_skipped_job_already_reset",
+                        extra={
+                            "event": "state_restore_skipped_job_already_reset",
+                            "job_status": job_status,
+                            "task_id": str(execution.task_id),
+                        },
+                    )
+            else:
+                # completed or failed — only restore if the job hasn't been cleaned yet
+                from sqlalchemy import text
+                job_row = await db.execute(
+                    text("SELECT status FROM jobs WHERE id = :task_id"),
+                    {"task_id": execution.task_id},
+                )
+                job_status = (job_row.fetchone() or (None,))[0]
+                if job_status in ("cleaned", "cleaning_up", None):
+                    logger.info(
+                        "state_restore_skipped",
+                        extra={
+                            "event": "state_restore_skipped",
+                            "task_id": str(execution.task_id),
+                            "job_status": job_status,
+                        },
+                    )
+                    return
+
+                _state.status = execution.status
                 _state.task_id = str(execution.task_id)
                 _state.work_dir_path = execution.work_dir_path
+                if execution.status == "failed":
+                    _state.error_message = execution.error_message
                 logger.info(
                     "state_restored",
                     extra={
                         "event": "state_restored",
                         "task_id": str(execution.task_id),
                         "work_dir_path": execution.work_dir_path,
-                        "status": "in_progress",
+                        "status": execution.status,
                     },
                 )
     except Exception as exc:
@@ -102,18 +171,24 @@ async def _restore_state_from_db(session_factory) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import socket
+
     # Run worker DB migrations before accepting connections
     await asyncio.to_thread(_run_migrations)
 
     engine = create_async_engine(settings.DATABASE_URL)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Restore last-completed-task state so push requests work after a restart
+    # Restore last task state so /push and /status work after a restart
     await _restore_state_from_db(session_factory)
 
     worker_url = _get_worker_url()
 
+    # Stable identity: use configured WORKER_ID or fall back to hostname
+    stable_worker_id = settings.WORKER_ID or socket.gethostname()
+
     worker_id = await register_with_controller(
+        worker_id=stable_worker_id,
         controller_url=settings.CONTROLLER_URL,
         agent_type=settings.AGENT_TYPE,
         worker_url=worker_url,
@@ -124,12 +199,13 @@ async def lifespan(app: FastAPI):
 
     heartbeat_task = asyncio.create_task(
         start_heartbeat_loop(
+            worker_id=stable_worker_id,
             controller_url=settings.CONTROLLER_URL,
-            worker_id=worker_id,
             get_status=get_current_state,
             agent_type=settings.AGENT_TYPE,
             worker_url=worker_url,
             interval_seconds=settings.HEARTBEAT_INTERVAL_SECONDS,
+            on_should_free=_set_state_free,
         )
     )
 

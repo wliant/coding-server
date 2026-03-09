@@ -13,6 +13,7 @@ router = APIRouter()
 
 
 class RegisterRequest(BaseModel):
+    worker_id: str
     agent_type: str
     worker_url: str
 
@@ -29,6 +30,7 @@ class HeartbeatRequest(BaseModel):
 
 class HeartbeatResponse(BaseModel):
     acknowledged: bool
+    should_free: bool = False
 
 
 class WorkerStatusResponse(BaseModel):
@@ -50,7 +52,7 @@ def make_router(registry: WorkerRegistry, on_completion_callback=None) -> APIRou
 
     @r.post("/workers/register", response_model=RegisterResponse)
     async def register_worker(req: RegisterRequest):
-        worker_id = await registry.register(req.agent_type, req.worker_url)
+        worker_id = await registry.register(req.worker_id, req.agent_type, req.worker_url)
         logger.info(
             "worker_registered",
             extra={
@@ -69,15 +71,18 @@ def make_router(registry: WorkerRegistry, on_completion_callback=None) -> APIRou
             raise HTTPException(status_code=404, detail="Worker not found — re-registration required")
 
         # If worker reports completion, trigger callback for DB update
+        should_free = False
         if req.status in ("completed", "failed") and on_completion_callback and req.task_id:
-            await on_completion_callback(
+            updated = await on_completion_callback(
                 worker_id=worker_id,
                 task_id=req.task_id,
                 status=req.status,
                 error_message=req.error_message,
             )
+            if not updated:
+                should_free = True
 
-        return HeartbeatResponse(acknowledged=True)
+        return HeartbeatResponse(acknowledged=True, should_free=should_free)
 
     @r.get("/workers", response_model=list[WorkerStatusResponse])
     async def list_workers():
