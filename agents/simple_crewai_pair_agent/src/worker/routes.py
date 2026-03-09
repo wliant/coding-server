@@ -110,6 +110,61 @@ def _is_binary(path: Path) -> bool:
         return False
 
 
+def _build_ignored_set(work_dir: Path) -> set[str]:
+    """Return a set of relative paths (forward slashes) that should be hidden.
+
+    Uses gitpython's ``repo.ignored()`` for git repos (honours all .gitignore
+    rules).  Falls back to a simple .gitignore line parser for non-git dirs.
+    """
+    import fnmatch
+
+    # Collect every candidate path (excluding .git itself) as a relative string.
+    candidates: list[str] = []
+    for p in work_dir.rglob("*"):
+        parts = p.relative_to(work_dir).parts
+        if parts[0] == ".git":
+            continue
+        candidates.append(str(p.relative_to(work_dir)).replace("\\", "/"))
+
+    if not candidates:
+        return set()
+
+    # --- try gitpython (git repo) ---
+    try:
+        import git as gitpython
+
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+        ignored = set(repo.ignored(*candidates))
+        return ignored
+    except Exception:
+        pass
+
+    # --- fallback: manual .gitignore parse ---
+    gitignore_file = work_dir / ".gitignore"
+    if not gitignore_file.exists():
+        return set()
+
+    patterns: list[str] = []
+    try:
+        for raw in gitignore_file.read_text(errors="replace").splitlines():
+            line = raw.strip()
+            if line and not line.startswith("#") and not line.startswith("!"):
+                patterns.append(line.rstrip("/"))
+    except OSError:
+        return set()
+
+    ignored: set[str] = set()
+    for rel in candidates:
+        name = rel.split("/")[-1]
+        for pat in patterns:
+            # Pattern with slash → match full path; otherwise match name only
+            target = rel if "/" in pat else name
+            if fnmatch.fnmatch(target, pat):
+                ignored.add(rel)
+                break
+    return ignored
+
+
 _MAX_FILE_BYTES = 500 * 1024  # 500 KB
 
 
@@ -252,11 +307,15 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
     @r.get("/files", response_model=FileListResponse)
     async def list_files(task_id: str | None = None):
         work_dir = _resolve_work_dir(task_id)
+        ignored = await asyncio.to_thread(_build_ignored_set, work_dir)
 
         entries: list[FileEntry] = []
         for p in sorted(work_dir.rglob("*")):
             rel = p.relative_to(work_dir)
             rel_str = str(rel).replace("\\", "/")
+            # Skip .git directory and all gitignored paths
+            if rel.parts[0] == ".git" or rel_str in ignored:
+                continue
             if p.is_dir():
                 entries.append(FileEntry(name=p.name, path=rel_str, type="directory"))
             else:
