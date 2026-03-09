@@ -93,9 +93,24 @@ class DeepAgent:
             },
         )
 
-        result = agent.invoke({"messages": [("user", task_prompt)]})
+        # Stream execution so every agent step is printed to stdout as it happens.
+        # stream_mode="values" emits the full state after each node; the last
+        # message in the state is the most recent reasoning step / tool call / result.
+        state: dict = {}
+        seen_ids: set[str] = set()
+        for state in agent.stream(
+            {"messages": [("user", task_prompt)]},
+            stream_mode="values",
+        ):
+            msgs = state.get("messages", [])
+            if msgs:
+                last = msgs[-1]
+                msg_id = getattr(last, "id", None)
+                if msg_id not in seen_ids:
+                    seen_ids.add(msg_id)
+                    last.pretty_print()
 
-        messages = result.get("messages", [])
+        messages = state.get("messages", [])
 
         # Extract last AI message as summary
         summary = ""
