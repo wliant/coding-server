@@ -77,6 +77,9 @@ def _task_to_detail_response(
         error_message=job.error_message,
         work_directory_path=work_directory.path if work_directory else None,
         elapsed_seconds=elapsed_seconds,
+        branch=job.branch,
+        assigned_worker_id=job.assigned_worker_id,
+        assigned_worker_url=job.assigned_worker_url,
     )
 
 

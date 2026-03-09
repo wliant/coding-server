@@ -905,6 +905,19 @@
             "title": "Assigned Worker Id",
             "description": "ID of the worker currently executing or that last executed this task.",
             "default": null
+          },
+          "assigned_worker_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Worker Url",
+            "description": "Internal URL of the worker assigned to this task",
+            "default": null
           }
         },
         "type": "object",

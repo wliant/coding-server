@@ -70,6 +70,7 @@ class TaskDetailResponse(BaseModel):
     elapsed_seconds: int | None = None
     branch: str | None = None
     assigned_worker_id: str | None = None
+    assigned_worker_url: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -7,6 +7,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -78,6 +79,38 @@ class PushResponse(BaseModel):
 
 class FreeResponse(BaseModel):
     freed: bool
+
+
+class FileEntry(BaseModel):
+    name: str
+    path: str
+    type: Literal["file", "directory"]
+    size: int | None = None
+    is_binary: bool | None = None
+
+
+class FileListResponse(BaseModel):
+    root: str
+    entries: list[FileEntry]
+
+
+class FileContentResponse(BaseModel):
+    path: str
+    content: str
+    size: int
+    is_binary: bool
+
+
+def _is_binary(path: Path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            chunk = f.read(8192)
+        return b"\x00" in chunk
+    except OSError:
+        return False
+
+
+_MAX_FILE_BYTES = 500 * 1024  # 500 KB
 
 
 def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
@@ -201,6 +234,67 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
         _state.work_dir_path = None
 
         return FreeResponse(freed=True)
+
+    def _resolve_work_dir(task_id: str | None) -> Path:
+        """Return the working directory for the given task_id, or fall back to _state."""
+        if task_id:
+            candidate = Path(work_dir_base) / task_id
+            if candidate.exists():
+                return candidate
+            raise HTTPException(status_code=404, detail=f"Working directory for task {task_id} not found on disk")
+        if not _state.work_dir_path:
+            raise HTTPException(status_code=404, detail="No working directory available")
+        work_dir = Path(_state.work_dir_path)
+        if not work_dir.exists():
+            raise HTTPException(status_code=404, detail="Working directory not found on disk")
+        return work_dir
+
+    @r.get("/files", response_model=FileListResponse)
+    async def list_files(task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+
+        entries: list[FileEntry] = []
+        for p in sorted(work_dir.rglob("*")):
+            rel = p.relative_to(work_dir)
+            rel_str = str(rel).replace("\\", "/")
+            if p.is_dir():
+                entries.append(FileEntry(name=p.name, path=rel_str, type="directory"))
+            else:
+                size = p.stat().st_size
+                entries.append(FileEntry(
+                    name=p.name,
+                    path=rel_str,
+                    type="file",
+                    size=size,
+                    is_binary=_is_binary(p),
+                ))
+        return FileListResponse(root=work_dir.name, entries=entries)
+
+    @r.get("/files/{path:path}", response_model=FileContentResponse)
+    async def get_file_content(path: str, task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+
+        try:
+            full = (work_dir / path).resolve()
+            full.relative_to(work_dir.resolve())  # raises ValueError if outside
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+
+        if not full.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        if full.is_dir():
+            raise HTTPException(status_code=400, detail="Path is a directory")
+
+        size = full.stat().st_size
+        is_bin = _is_binary(full)
+        if is_bin:
+            return FileContentResponse(path=path, content="", size=size, is_binary=True)
+
+        with open(full, encoding="utf-8", errors="replace") as f:
+            content = f.read(_MAX_FILE_BYTES)
+        if size > _MAX_FILE_BYTES:
+            content = "[TRUNCATED — file exceeds 500 KB. Use Download to access the full file.]\n\n" + content
+        return FileContentResponse(path=path, content=content, size=size, is_binary=False)
 
     return r
 
