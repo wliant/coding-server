@@ -1,0 +1,160 @@
+openapi: "3.1.0"
+info:
+  title: Worker File Browser API
+  description: |
+    New endpoints added to the Agent Worker service (simple_crewai_pair_agent)
+    to support source code browsing from the Task Detail UI.
+
+    The web frontend calls these endpoints directly using the worker URL
+    exposed via NEXT_PUBLIC_WORKER_URL (browser-accessible base URL).
+  version: "1.0.0"
+
+servers:
+  - url: "http://localhost:8001"
+    description: "Dev worker (port exposed by compose.dev.yaml)"
+
+paths:
+  /files:
+    get:
+      operationId: listFiles
+      summary: List all files and directories in the working directory
+      description: |
+        Returns a flat, depth-first alphabetically-sorted list of all FileEntry
+        objects in the current task's working directory.
+
+        Requires the worker to have an active working directory in memory
+        (task status completed or failed, before cleanup). Returns 404 if
+        no working directory is available.
+      responses:
+        "200":
+          description: File listing returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileListResponse"
+        "404":
+          description: No working directory available (worker restarted or task cleaned up)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /files/{path}:
+    get:
+      operationId: getFileContent
+      summary: Get the content of a file at the given relative path
+      description: |
+        Returns the UTF-8 text content of the file at `path` (relative to
+        the working directory root). Binary files return an empty `content`
+        field with `is_binary: true`. Files larger than 500 KB are truncated
+        with a warning prefix in the `content` field.
+
+        Path traversal is prevented: any path resolving outside the working
+        directory returns 403.
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: |
+            Relative path of the file within the working directory.
+            Forward-slash separated. URL-encoded if it contains special characters.
+          example: "src/main.py"
+      responses:
+        "200":
+          description: File content returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileContentResponse"
+        "400":
+          description: Path is a directory, not a file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Path resolves outside the working directory (traversal attempt)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: File not found, or no working directory available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    FileEntry:
+      type: object
+      required: [name, path, type]
+      properties:
+        name:
+          type: string
+          description: Filename or directory name (last path segment)
+          example: "main.py"
+        path:
+          type: string
+          description: Relative path from working directory root (forward-slash separated)
+          example: "src/main.py"
+        type:
+          type: string
+          enum: [file, directory]
+          description: Whether this entry is a file or directory
+        size:
+          type: integer
+          nullable: true
+          description: File size in bytes; null for directories
+          example: 2048
+        is_binary:
+          type: boolean
+          nullable: true
+          description: True if the file contains binary content; null for directories
+          example: false
+
+    FileListResponse:
+      type: object
+      required: [entries, root]
+      properties:
+        root:
+          type: string
+          description: Task ID (working directory basename)
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileEntry"
+          description: Flat sorted list of all files and directories
+
+    FileContentResponse:
+      type: object
+      required: [path, content, size, is_binary]
+      properties:
+        path:
+          type: string
+          description: Relative path echoed from request
+          example: "src/main.py"
+        content:
+          type: string
+          description: |
+            UTF-8 decoded file content. Empty string for binary files.
+            Files >500 KB are prefixed with a truncation warning.
+        size:
+          type: integer
+          description: File size in bytes
+          example: 2048
+        is_binary:
+          type: boolean
+          description: True if the file was detected as binary (null bytes in first 8 KB)
+          example: false
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
