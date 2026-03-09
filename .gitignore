@@ -66,3 +66,6 @@ web/src/client/
 
 # Local machine-specific workspace (IDE data, personal scripts)
 .local/
+
+# Playwright MCP browser session logs
+.playwright-mcp/
