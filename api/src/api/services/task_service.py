@@ -190,6 +190,29 @@ async def trigger_push(
         raise HTTPException(status_code=502, detail=f"Git push failed: {exc}") from exc
 
 
+async def download_task_code(db: AsyncSession, task_id: uuid.UUID) -> tuple[bytes, str]:
+    """Proxy zip download from assigned worker.
+
+    Returns (zip_bytes, filename).
+    Raises HTTPException 404 if task not found, 409 if no worker assigned.
+    """
+    import httpx
+
+    result = await db.execute(select(Job).where(Job.id == task_id))
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not job.assigned_worker_url:
+        raise HTTPException(status_code=409, detail="No worker assigned to this task")
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(f"{job.assigned_worker_url}/download")
+        resp.raise_for_status()
+
+    filename = f"task-{str(task_id)[:8]}.zip"
+    return resp.content, filename
+
+
 async def initiate_cleanup(db: AsyncSession, task_id: uuid.UUID) -> Job:
     """Initiate cleanup for a completed or failed task.
 

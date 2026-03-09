@@ -228,8 +228,6 @@ def _push_sync(work_dir: str, authenticated_url: str) -> tuple[str, str]:
     repo.git.add(A=True)
 
     # Commit when there are no commits yet (fresh init) or the index differs from HEAD.
-    # Short-circuit: check head.is_valid() first so we never call index.diff("HEAD") on a
-    # repo with no commits (which would raise BadObject).
     needs_commit = not repo.head.is_valid() or bool(repo.index.diff("HEAD"))
     if needs_commit:
         repo.index.commit(

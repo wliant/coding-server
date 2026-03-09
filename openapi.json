@@ -385,6 +385,30 @@
         "description": "Partial update: only supply keys to change. Unknown keys return 422. Valid keys: agent.work.path, agent.simple_crewai.llm_provider (ollama|openai|anthropic), agent.simple_crewai.llm_model, agent.simple_crewai.llm_temperature (float 0.0-2.0), agent.simple_crewai.ollama_base_url, agent.simple_crewai.openai_api_key, agent.simple_crewai.anthropic_api_key, github.token"
       }
     },
+    "/tasks/{task_id}/download": {
+      "get": {
+        "summary": "Download Task Code",
+        "description": "Download the implemented source code as a zip archive.",
+        "operationId": "download_task_tasks__task_id__download_get",
+        "tags": ["tasks"],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid", "title": "Task Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zip archive of the working directory",
+            "content": { "application/zip": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "404": { "description": "Task not found" },
+          "409": { "description": "No worker assigned" }
+        }
+      }
+    },
     "/tasks/{task_id}/cleanup": {
       "post": {
         "tags": [

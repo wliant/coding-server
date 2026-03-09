@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.db import get_db
@@ -109,6 +109,19 @@ async def push_task_to_remote(
 ):
     git_url_override = body.git_url if body else None
     return await task_service.trigger_push(db, task_id, git_url_override=git_url_override)
+
+
+@router.get("/{task_id}/download")
+async def download_task(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    zip_bytes, filename = await task_service.download_task_code(db, task_id)
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.post("/{task_id}/cleanup", response_model=CleanupResponse)

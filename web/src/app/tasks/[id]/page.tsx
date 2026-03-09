@@ -21,6 +21,8 @@ export default function TaskDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!taskId) return;
@@ -143,6 +145,46 @@ export default function TaskDetailPage() {
         {task.status === "completed" && (
           <div className="pt-2 border-t">
             <PushToRemoteButton taskId={task.id} projectGitUrl={task.project.git_url} />
+          </div>
+        )}
+
+        {(task.status === "completed" || task.status === "failed" || task.status === "cleaning_up" || task.status === "cleaned") && (
+          <div className="pt-2 border-t space-y-2">
+            {downloadError && (
+              <p className="text-sm text-red-600">{downloadError}</p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDownloading}
+              onClick={async () => {
+                setIsDownloading(true);
+                setDownloadError(null);
+                try {
+                  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+                  const resp = await fetch(`${apiBase}/tasks/${task.id}/download`);
+                  if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(text || `Download failed (${resp.status})`);
+                  }
+                  const blob = await resp.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `task-${task.id.slice(0, 8)}.zip`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  setDownloadError(
+                    err instanceof Error ? err.message : "Download failed"
+                  );
+                } finally {
+                  setIsDownloading(false);
+                }
+              }}
+            >
+              {isDownloading ? "Downloading…" : "Download Code"}
+            </Button>
           </div>
         )}
 
