@@ -133,6 +133,34 @@ services:
       timeout: 5s
       retries: 5
 
+  simple_langchain_deepagent:
+    build:
+      context: ./agents/simple_langchain_deepagent
+    expose:
+      - "8004"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-madm}
+      CONTROLLER_URL: http://controller:8003
+      AGENT_TYPE: ${LANGCHAIN_AGENT_TYPE:-simple_langchain_deepagent}
+      WORK_DIR: /agent-work
+      WORKER_PORT: "8004"
+      TOOLS_GATEWAY_URL: http://tools:8002
+      HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-15}
+    volumes:
+      - agent_work:/agent-work
+    networks:
+      - backend
+    depends_on:
+      controller:
+        condition: service_healthy
+      tools:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build:
       context: .

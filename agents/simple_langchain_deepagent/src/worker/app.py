@@ -152,7 +152,7 @@ def create_app() -> FastAPI:
     engine = create_async_engine(settings.DATABASE_URL)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    app = FastAPI(title="Agent Worker", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="Deep Agent Worker", version="1.0.0", lifespan=lifespan)
     router = make_router(work_dir_base=settings.WORK_DIR, db_session_factory=session_factory)
     app.include_router(router)
     return app

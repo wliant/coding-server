@@ -85,14 +85,19 @@ tasks:
     cmds:
       - docker compose -f compose.yaml -f compose.dev.yaml exec controller python -m pytest tests/ -p no:cacheprovider
 
+  test-deepagent:
+    desc: Run simple_langchain_deepagent pytest suite (requires dev environment running)
+    cmds:
+      - docker compose -f compose.yaml -f compose.dev.yaml exec simple_langchain_deepagent python -m pytest tests/ -p no:cacheprovider
+
   test-all:
     desc: Run all pytest suites and web jest suite
     summary: |
-      Runs test-api, test-worker, test-controller, test-tools, and test-web concurrently.
+      Runs test-api, test-worker, test-controller, test-tools, test-web, and test-deepagent concurrently.
       Requires the dev environment to be running ('task dev') for the container tests.
       test-web runs on the host and requires Node.js.
       Exit code is non-zero if any suite fails.
-    deps: [test-api, test-worker, test-controller, test-tools, test-web]
+    deps: [test-api, test-worker, test-controller, test-tools, test-web, test-deepagent]
 
   lint-api:
     desc: Lint OpenAPI spec with Redocly

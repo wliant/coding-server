@@ -94,35 +94,49 @@ async def _handle_cleaning_up_tasks(
     cleaning_jobs = result.scalars().all()
 
     for job in cleaning_jobs:
+        worker_id_to_free = job.assigned_worker_id
+        now = datetime.now(timezone.utc)
+        worker_gone = False
+
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(f"{job.assigned_worker_url}/free")
                 resp.raise_for_status()
-
-            # Mark job as cleaned and free the worker in registry
-            worker_id_to_free = job.assigned_worker_id
-            now = datetime.now(timezone.utc)
-            await db.execute(
-                update(Job)
-                .where(Job.id == job.id)
-                .values(
-                    status="cleaned",
-                    assigned_worker_id=None,
-                    assigned_worker_url=None,
-                    updated_at=now,
-                )
-            )
-            if worker_id_to_free:
-                await registry.set_free(worker_id_to_free)
-            logger.info(
-                "cleanup_succeeded",
-                extra={"event": "cleanup_succeeded", "task_id": str(job.id)},
+        except httpx.ConnectError:
+            # Worker container is gone (restarted/replaced) — treat as already freed
+            worker_gone = True
+            logger.warning(
+                "cleanup_worker_unreachable",
+                extra={
+                    "event": "cleanup_worker_unreachable",
+                    "task_id": str(job.id),
+                    "worker_url": job.assigned_worker_url,
+                },
             )
         except Exception as exc:
             logger.error(
                 "cleanup_failed",
                 extra={"event": "cleanup_failed", "task_id": str(job.id), "error": str(exc)},
             )
+            continue
+
+        # Mark job as cleaned (whether worker responded or was already gone)
+        await db.execute(
+            update(Job)
+            .where(Job.id == job.id)
+            .values(
+                status="cleaned",
+                assigned_worker_id=None,
+                assigned_worker_url=None,
+                updated_at=now,
+            )
+        )
+        if worker_id_to_free and not worker_gone:
+            await registry.set_free(worker_id_to_free)
+        logger.info(
+            "cleanup_succeeded",
+            extra={"event": "cleanup_succeeded", "task_id": str(job.id), "worker_gone": worker_gone},
+        )
 
     if cleaning_jobs:
         await db.commit()
@@ -270,9 +284,9 @@ async def process_task_completion(
     now = datetime.now(timezone.utc)
     worker_rec = await registry.get(worker_id)
     worker_url = worker_rec.worker_url if worker_rec else None
-    await db.execute(
+    result = await db.execute(
         update(Job)
-        .where(Job.id == uuid.UUID(task_id))
+        .where(Job.id == uuid.UUID(task_id), Job.status == "in_progress")
         .values(
             status=status,
             completed_at=now,
@@ -281,12 +295,15 @@ async def process_task_completion(
             assigned_worker_url=worker_url,
             updated_at=now,
         )
+        .returning(Job.id)
     )
+    updated = result.fetchone()
     await db.commit()
-    logger.info(
-        "task_completed" if status == "completed" else "task_failed",
-        extra={"event": f"task_{status}", "task_id": task_id, "worker_id": worker_id},
-    )
+    if updated:
+        logger.info(
+            "task_completed" if status == "completed" else "task_failed",
+            extra={"event": f"task_{status}", "task_id": task_id, "worker_id": worker_id},
+        )
 
 
 async def run_poll_cycle(
