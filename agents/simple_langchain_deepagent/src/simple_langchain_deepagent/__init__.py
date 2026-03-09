@@ -1,7 +1,7 @@
-"""simple_langchain_deepagent — LangGraph ReAct deep agent."""
+"""simple_langchain_deepagent — LangChain deep agent (deepagents SDK)."""
 
-from simple_langchain_deepagent.agent import DeepAgent, create_deep_agent
+from simple_langchain_deepagent.agent import DeepAgent
 from simple_langchain_deepagent.config import DeepAgentConfig
 from simple_langchain_deepagent.result import DeepAgentResult
 
-__all__ = ["DeepAgent", "create_deep_agent", "DeepAgentConfig", "DeepAgentResult"]
+__all__ = ["DeepAgent", "DeepAgentConfig", "DeepAgentResult"]

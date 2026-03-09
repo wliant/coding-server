@@ -1,11 +1,10 @@
-"""DeepAgent — public entry point for running a coding task via LangGraph ReAct."""
+"""DeepAgent — public entry point for running a coding task via LangChain deepagents."""
 
 import logging
 from pathlib import Path
 
 from simple_langchain_deepagent.config import DeepAgentConfig
 from simple_langchain_deepagent.result import DeepAgentResult
-from simple_langchain_deepagent.tools import make_file_tools
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,8 @@ _SUPPORTED_PROVIDERS = ("ollama", "openai", "anthropic")
 SYSTEM_PROMPT = (
     "You are a senior software developer. "
     "Implement the requested feature by writing code to files using the available tools. "
-    "Think step by step: plan the solution, write the code, then summarise what you did."
+    "Think step by step: plan the solution, write the code, verify your implementation, "
+    "then summarise what you did."
 )
 
 
@@ -57,36 +57,27 @@ def _make_llm(config: DeepAgentConfig):
     )
 
 
-def create_deep_agent(system_prompt: str, llm, tools):
-    """Build a compiled LangGraph ReAct agent graph.
-
-    Args:
-        system_prompt: System instructions for the agent.
-        llm: A LangChain chat model instance.
-        tools: List of LangChain tool objects.
-
-    Returns:
-        A compiled LangGraph CompiledGraph ready for invocation.
-    """
-    from langgraph.prebuilt import create_react_agent
-
-    return create_react_agent(model=llm, tools=tools, prompt=system_prompt)
-
-
 class DeepAgent:
-    """Run a LangGraph ReAct agent for a given coding requirement."""
+    """Run a LangChain deep agent for a given coding requirement."""
 
     def __init__(self, config: DeepAgentConfig) -> None:
         self.config = config
 
     def run(self) -> DeepAgentResult:
-        """Execute the agent graph and return the result."""
+        """Execute the deep agent and return the result."""
+        from deepagents import create_deep_agent
+        from deepagents.backends import LocalShellBackend
+
         config = self.config
         config.working_directory.mkdir(parents=True, exist_ok=True)
 
-        tools = make_file_tools(config.working_directory)
         llm = _make_llm(config)
-        graph = create_deep_agent(SYSTEM_PROMPT, llm, tools)
+        backend = LocalShellBackend(root_dir=str(config.working_directory))
+        agent = create_deep_agent(
+            model=llm,
+            backend=backend,
+            system_prompt=SYSTEM_PROMPT,
+        )
 
         task_prompt = (
             f"Project: {config.project_name}\n\nRequirement:\n{config.requirement}"
@@ -102,7 +93,7 @@ class DeepAgent:
             },
         )
 
-        result = graph.invoke({"messages": [("user", task_prompt)]})
+        result = agent.invoke({"messages": [("user", task_prompt)]})
 
         messages = result.get("messages", [])
 
