@@ -112,6 +112,26 @@ class FileContentResponse(BaseModel):
     is_binary: bool
 
 
+class DiffFileEntry(BaseModel):
+    path: str
+    change_type: Literal["modified", "added", "deleted", "renamed"]
+    additions: int
+    deletions: int
+    old_path: str | None = None  # only for renamed files
+
+
+class DiffListResponse(BaseModel):
+    changed_files: list[DiffFileEntry]
+    total_additions: int
+    total_deletions: int
+
+
+class FileDiffResponse(BaseModel):
+    path: str
+    diff: str          # raw unified diff text
+    is_new_file: bool
+
+
 def _is_binary(path: Path) -> bool:
     try:
         with open(path, "rb") as f:
@@ -366,6 +386,20 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
             content = "[TRUNCATED — file exceeds 500 KB. Use Download to access the full file.]\n\n" + content
         return FileContentResponse(path=path, content=content, size=size, is_binary=False)
 
+    @r.get("/diff", response_model=DiffListResponse)
+    async def list_diff(task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+        return await asyncio.to_thread(_build_diff_list, work_dir)
+
+    @r.get("/diff/{path:path}", response_model=FileDiffResponse)
+    async def get_file_diff(path: str, task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+        try:
+            (work_dir / path).resolve().relative_to(work_dir.resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+        return await asyncio.to_thread(_build_file_diff, work_dir, path)
+
     return r
 
 
@@ -411,6 +445,126 @@ def _push_sync(work_dir: str, authenticated_url: str) -> tuple[str, str]:
 
     repo.remote("origin").push(refspec=f"{branch_name}:{branch_name}")
     return branch_name, authenticated_url
+
+
+def _build_diff_list(work_dir: Path) -> DiffListResponse:
+    """Compute the list of changed files vs HEAD. Runs in executor thread."""
+    import git as gitpython
+
+    try:
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+    except gitpython.exc.InvalidGitRepositoryError:
+        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+
+    entries: list[DiffFileEntry] = []
+    total_additions = 0
+    total_deletions = 0
+
+    if repo.head.is_valid():
+        numstat = repo.git.diff("HEAD", "--numstat", "--find-renames")
+        if numstat:
+            for line in numstat.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 3:
+                    continue
+                add_str, del_str = parts[0], parts[1]
+                file_part = "\t".join(parts[2:])
+
+                additions = 0 if add_str == "-" else int(add_str)
+                deletions = 0 if del_str == "-" else int(del_str)
+
+                if " => " in file_part:
+                    # Handle "{old_dir => new_dir}/file.py" or "old.py => new.py"
+                    if file_part.startswith("{") and "}" in file_part:
+                        brace_end = file_part.index("}")
+                        brace_content = file_part[1:brace_end]
+                        suffix = file_part[brace_end + 1:]
+                        if " => " in brace_content:
+                            old_dir, new_dir = brace_content.split(" => ", 1)
+                            old_path = (old_dir + suffix).lstrip("/")
+                            new_path = (new_dir + suffix).lstrip("/")
+                        else:
+                            old_path = new_path = file_part
+                    else:
+                        old_path, new_path = file_part.split(" => ", 1)
+                    entries.append(DiffFileEntry(
+                        path=new_path.strip(),
+                        change_type="renamed",
+                        additions=additions,
+                        deletions=deletions,
+                        old_path=old_path.strip(),
+                    ))
+                else:
+                    path = file_part
+                    change_type = "deleted" if not (work_dir / path).exists() else "modified"
+                    entries.append(DiffFileEntry(
+                        path=path,
+                        change_type=change_type,
+                        additions=additions,
+                        deletions=deletions,
+                    ))
+
+                total_additions += additions
+                total_deletions += deletions
+
+    # Append untracked files
+    for rel_path in repo.untracked_files:
+        full = work_dir / rel_path
+        if _is_binary(full):
+            additions = 0
+        else:
+            try:
+                additions = len(full.read_text(errors="replace").splitlines())
+            except OSError:
+                additions = 0
+        entries.append(DiffFileEntry(
+            path=rel_path,
+            change_type="added",
+            additions=additions,
+            deletions=0,
+        ))
+        total_additions += additions
+
+    return DiffListResponse(
+        changed_files=entries,
+        total_additions=total_additions,
+        total_deletions=total_deletions,
+    )
+
+
+def _build_file_diff(work_dir: Path, path: str) -> FileDiffResponse:
+    """Return unified diff for a single file vs HEAD. Runs in executor thread."""
+    import git as gitpython
+
+    try:
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+    except gitpython.exc.InvalidGitRepositoryError:
+        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+
+    # Check if it's an untracked (new) file
+    if path in repo.untracked_files:
+        full = work_dir / path
+        if _is_binary(full):
+            return FileDiffResponse(path=path, diff="", is_new_file=True)
+        try:
+            text = full.read_text(errors="replace")
+        except OSError:
+            return FileDiffResponse(path=path, diff="", is_new_file=True)
+        lines = text.splitlines()
+        n = len(lines)
+        diff_parts = [f"--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{n} @@"]
+        diff_parts.extend(f"+{line}" for line in lines)
+        return FileDiffResponse(path=path, diff="\n".join(diff_parts), is_new_file=True)
+
+    # Tracked file: get diff from HEAD
+    if not repo.head.is_valid():
+        raise HTTPException(status_code=404, detail="No diff found")
+
+    diff_text = repo.git.diff("HEAD", "--", path)
+    if not diff_text:
+        raise HTTPException(status_code=404, detail="No diff found")
+
+    return FileDiffResponse(path=path, diff=diff_text, is_new_file=False)
 
 
 async def _execute_work(req: WorkRequest, work_dir: Path, db_session_factory) -> None:

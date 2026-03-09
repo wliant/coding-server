@@ -86,6 +86,34 @@ test("POST /tasks/{id}/push returns 404 for unknown task", async ({
   expect(response.status()).toBe(404);
 });
 
+const WORKER_URL = process.env.WORKER_URL || "http://localhost:8001";
+
+test("GET /diff?task_id=nonexistent-id on worker returns 404", async ({
+  request,
+}) => {
+  const response = await request.get(
+    `${WORKER_URL}/diff?task_id=00000000-0000-0000-0000-000000000099`,
+  );
+  expect(response.status()).toBe(404);
+});
+
+test("GET /diff/{path} path traversal on worker returns 403 or 404", async ({
+  request,
+}) => {
+  const response = await request.get(
+    `${WORKER_URL}/diff/../../etc/passwd?task_id=00000000-0000-0000-0000-000000000099`,
+  );
+  // 404 because the task_id dir doesn't exist (resolved before path check), or 403 after
+  expect([403, 404]).toContain(response.status());
+});
+
+test("GET /diff with no active task on worker returns 404 or 400", async ({
+  request,
+}) => {
+  const response = await request.get(`${WORKER_URL}/diff`);
+  expect([400, 404]).toContain(response.status());
+});
+
 test("GET /tasks returns list including newly created task", async ({
   request,
 }) => {
