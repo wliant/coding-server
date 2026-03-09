@@ -26,6 +26,8 @@ services:
   simple_crewai_pair_agent:
     ports:
       - "${WORKER_PORT:-8101}:8001"
+    environment:
+      CORS_ORIGINS: "http://web:3000"
     env_file:
       - .env.e2e
 
