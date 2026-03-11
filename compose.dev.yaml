@@ -81,6 +81,19 @@ services:
     env_file:
       - .env
 
+  openhands_agent:
+    ports:
+      - "${OPENHANDS_PORT:-8005}:8005"
+    volumes:
+      - ./agents/openhands_agent/src:/app/src
+      - ./agents/openhands_agent/tests:/app/tests
+      - ./agents/openhands_agent/alembic:/app/alembic
+      - ./agent-work:/agent-work
+    environment:
+      PYTHONPATH: /app/src
+    env_file:
+      - .env
+
   web:
     build:
       context: .
