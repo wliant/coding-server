@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
+import { useTheme } from "next-themes";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { githubGist } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 interface FileViewerProps {
   content: string;
@@ -48,6 +50,7 @@ export function FileViewer({
   isLoading,
   error,
 }: FileViewerProps) {
+  const { resolvedTheme } = useTheme();
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-2">
@@ -88,7 +91,7 @@ export function FileViewer({
     <div className="flex-1 overflow-auto text-xs">
       <SyntaxHighlighter
         language={inferLanguage(filePath)}
-        style={githubGist}
+        style={resolvedTheme === "dark" ? atomOneDark : githubGist}
         showLineNumbers
         wrapLongLines={false}
         customStyle={{ margin: 0, borderRadius: 0, fontSize: "0.75rem" }}

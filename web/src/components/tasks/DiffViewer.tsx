@@ -13,10 +13,10 @@ interface DiffViewerProps {
 }
 
 const BADGE_STYLES: Record<string, string> = {
-  modified: "bg-yellow-100 text-yellow-800",
-  added: "bg-green-100 text-green-800",
-  deleted: "bg-red-100 text-red-800",
-  renamed: "bg-blue-100 text-blue-800",
+  modified: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+  added: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+  deleted: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  renamed: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
 };
 
 const BADGE_LABELS: Record<string, string> = {
@@ -79,22 +79,22 @@ function DiffLine({ line }: { line: ParsedLine }) {
 
   if (line.type === "hunk-header") {
     return (
-      <tr className="bg-[#ddf4ff]">
-        <td className="px-2 py-0 text-right text-xs text-[#0550ae] w-10 select-none border-r" />
-        <td className="px-2 py-0 text-right text-xs text-[#0550ae] w-10 select-none border-r" />
-        <td className="px-2 py-0 text-xs text-[#0550ae] font-mono whitespace-pre">{line.content}</td>
+      <tr className="bg-[#ddf4ff] dark:bg-[#0d1d30]">
+        <td className="px-2 py-0 text-right text-xs text-[#0550ae] dark:text-[#79c0ff] w-10 select-none border-r" />
+        <td className="px-2 py-0 text-right text-xs text-[#0550ae] dark:text-[#79c0ff] w-10 select-none border-r" />
+        <td className="px-2 py-0 text-xs text-[#0550ae] dark:text-[#79c0ff] font-mono whitespace-pre">{line.content}</td>
       </tr>
     );
   }
 
   if (line.type === "addition") {
     return (
-      <tr className="bg-[#e6ffec]">
-        <td className="px-2 py-0 text-right text-xs text-[#1a7f37] w-10 select-none border-r" />
-        <td className="px-2 py-0 text-right text-xs text-[#1a7f37] w-10 select-none border-r">
+      <tr className="bg-[#e6ffec] dark:bg-[#0f2d1a]">
+        <td className="px-2 py-0 text-right text-xs text-[#1a7f37] dark:text-[#3fb950] w-10 select-none border-r" />
+        <td className="px-2 py-0 text-right text-xs text-[#1a7f37] dark:text-[#3fb950] w-10 select-none border-r">
           {line.newLineNo}
         </td>
-        <td className="px-2 py-0 text-xs font-mono whitespace-pre text-[#1a7f37]">
+        <td className="px-2 py-0 text-xs font-mono whitespace-pre text-[#1a7f37] dark:text-[#3fb950]">
           <span className="select-none mr-1">+</span>{line.content}
         </td>
       </tr>
@@ -103,12 +103,12 @@ function DiffLine({ line }: { line: ParsedLine }) {
 
   if (line.type === "deletion") {
     return (
-      <tr className="bg-[#ffebe9]">
-        <td className="px-2 py-0 text-right text-xs text-[#cf222e] w-10 select-none border-r">
+      <tr className="bg-[#ffebe9] dark:bg-[#2d1117]">
+        <td className="px-2 py-0 text-right text-xs text-[#cf222e] dark:text-[#f85149] w-10 select-none border-r">
           {line.oldLineNo}
         </td>
-        <td className="px-2 py-0 text-right text-xs text-[#cf222e] w-10 select-none border-r" />
-        <td className="px-2 py-0 text-xs font-mono whitespace-pre text-[#cf222e]">
+        <td className="px-2 py-0 text-right text-xs text-[#cf222e] dark:text-[#f85149] w-10 select-none border-r" />
+        <td className="px-2 py-0 text-xs font-mono whitespace-pre text-[#cf222e] dark:text-[#f85149]">
           <span className="select-none mr-1">-</span>{line.content}
         </td>
       </tr>
@@ -117,7 +117,7 @@ function DiffLine({ line }: { line: ParsedLine }) {
 
   // context
   return (
-    <tr className="bg-white">
+    <tr className="bg-white dark:bg-transparent">
       <td className="px-2 py-0 text-right text-xs text-muted-foreground w-10 select-none border-r">
         {line.oldLineNo}
       </td>
@@ -173,10 +173,10 @@ export function DiffViewer({
                     <span className="block text-xs truncate">{f.path}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {f.additions > 0 && (
-                        <span className="text-[#1a7f37]">+{f.additions} </span>
+                        <span className="text-[#1a7f37] dark:text-[#3fb950]">+{f.additions} </span>
                       )}
                       {f.deletions > 0 && (
-                        <span className="text-[#cf222e]">-{f.deletions}</span>
+                        <span className="text-[#cf222e] dark:text-[#f85149]">-{f.deletions}</span>
                       )}
                     </span>
                   </span>
