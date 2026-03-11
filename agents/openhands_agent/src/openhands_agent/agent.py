@@ -88,7 +88,7 @@ class OpenHandsAgent:
         if provider == "ollama":
             return LLM(
                 model=f"ollama/{c.llm_model}",
-                base_url=f"{c.ollama_base_url}/v1",
+                base_url=c.ollama_base_url,
                 temperature=c.llm_temperature,
             )
 
