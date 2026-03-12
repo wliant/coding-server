@@ -19,7 +19,11 @@ class OpenHandsAgent:
 
     def run(self) -> OpenHandsAgentResult:
         """Execute the OpenHands agent and return the result."""
-        from openhands.sdk import LLM, Agent, LocalConversation
+        from openhands.sdk import LLM, Agent, LocalConversation, Tool
+
+        # Import tool modules to trigger registration with the tool registry
+        import openhands.tools.terminal  # noqa: F401
+        import openhands.tools.file_editor  # noqa: F401
 
         config = self.config
         config.working_directory.mkdir(parents=True, exist_ok=True)
@@ -36,7 +40,13 @@ class OpenHandsAgent:
             },
         )
 
-        agent = Agent(llm=llm)
+        agent = Agent(
+            llm=llm,
+            tools=[
+                Tool(name="terminal"),
+                Tool(name="file_editor"),
+            ],
+        )
 
         task_prompt = (
             f"Project: {config.project_name}\n\n"
@@ -90,6 +100,7 @@ class OpenHandsAgent:
                 model=f"ollama/{c.llm_model}",
                 base_url=c.ollama_base_url,
                 temperature=c.llm_temperature,
+                native_tool_calling=False,
             )
 
         if provider == "anthropic":
