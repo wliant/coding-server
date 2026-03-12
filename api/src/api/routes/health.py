@@ -3,8 +3,6 @@ import logging
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from api.db import async_session_factory
 
 logger = logging.getLogger(__name__)

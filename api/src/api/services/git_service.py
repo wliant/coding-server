@@ -5,7 +5,6 @@ branch to a remote URL. Avoids subprocess shell injection.
 """
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 import git
 
@@ -39,8 +38,6 @@ def push_working_directory_to_remote(
         git.GitCommandError: If the push fails (caller maps to HTTP 502)
         git.InvalidGitRepositoryError: If work_dir_path is not accessible
     """
-    work_dir = Path(work_dir_path)
-
     logger.info(
         "git_push_starting",
         extra={
