@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from controller.config import settings
 from controller.models import Agent, Job, Project, Sandbox
