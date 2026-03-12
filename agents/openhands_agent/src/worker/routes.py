@@ -7,6 +7,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -89,6 +90,105 @@ class PushResponse(BaseModel):
 
 class FreeResponse(BaseModel):
     freed: bool
+
+
+class FileEntry(BaseModel):
+    name: str
+    path: str
+    type: Literal["file", "directory"]
+    size: int | None = None
+    is_binary: bool | None = None
+
+
+class FileListResponse(BaseModel):
+    root: str
+    entries: list[FileEntry]
+
+
+class FileContentResponse(BaseModel):
+    path: str
+    content: str
+    size: int
+    is_binary: bool
+
+
+class DiffFileEntry(BaseModel):
+    path: str
+    change_type: Literal["modified", "added", "deleted", "renamed"]
+    additions: int
+    deletions: int
+    old_path: str | None = None  # only for renamed files
+
+
+class DiffListResponse(BaseModel):
+    changed_files: list[DiffFileEntry]
+    total_additions: int
+    total_deletions: int
+
+
+class FileDiffResponse(BaseModel):
+    path: str
+    diff: str          # raw unified diff text
+    is_new_file: bool
+
+
+def _is_binary(path: Path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            chunk = f.read(8192)
+        return b"\x00" in chunk
+    except OSError:
+        return False
+
+
+def _build_ignored_set(work_dir: Path) -> set[str]:
+    """Return a set of relative paths (forward slashes) that should be hidden."""
+    import fnmatch
+
+    candidates: list[str] = []
+    for p in work_dir.rglob("*"):
+        parts = p.relative_to(work_dir).parts
+        if parts[0] == ".git":
+            continue
+        candidates.append(str(p.relative_to(work_dir)).replace("\\", "/"))
+
+    if not candidates:
+        return set()
+
+    try:
+        import git as gitpython
+
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+        ignored = set(repo.ignored(*candidates))
+        return ignored
+    except Exception:
+        pass
+
+    gitignore_file = work_dir / ".gitignore"
+    if not gitignore_file.exists():
+        return set()
+
+    patterns: list[str] = []
+    try:
+        for raw in gitignore_file.read_text(errors="replace").splitlines():
+            line = raw.strip()
+            if line and not line.startswith("#") and not line.startswith("!"):
+                patterns.append(line.rstrip("/"))
+    except OSError:
+        return set()
+
+    ignored: set[str] = set()
+    for rel in candidates:
+        name = rel.split("/")[-1]
+        for pat in patterns:
+            target = rel if "/" in pat else name
+            if fnmatch.fnmatch(target, pat):
+                ignored.add(rel)
+                break
+    return ignored
+
+
+_MAX_FILE_BYTES = 500 * 1024  # 500 KB
 
 
 def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
@@ -213,6 +313,84 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
 
         return FreeResponse(freed=True)
 
+    def _resolve_work_dir(task_id: str | None) -> Path:
+        """Return the working directory for the given task_id, or fall back to _state."""
+        if task_id:
+            candidate = Path(work_dir_base) / task_id
+            if candidate.exists():
+                return candidate
+            raise HTTPException(status_code=404, detail=f"Working directory for task {task_id} not found on disk")
+        if not _state.work_dir_path:
+            raise HTTPException(status_code=404, detail="No working directory available")
+        work_dir = Path(_state.work_dir_path)
+        if not work_dir.exists():
+            raise HTTPException(status_code=404, detail="Working directory not found on disk")
+        return work_dir
+
+    @r.get("/files", response_model=FileListResponse)
+    async def list_files(task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+        ignored = await asyncio.to_thread(_build_ignored_set, work_dir)
+
+        entries: list[FileEntry] = []
+        for p in sorted(work_dir.rglob("*")):
+            rel = p.relative_to(work_dir)
+            rel_str = str(rel).replace("\\", "/")
+            if rel.parts[0] == ".git" or rel_str in ignored:
+                continue
+            if p.is_dir():
+                entries.append(FileEntry(name=p.name, path=rel_str, type="directory"))
+            else:
+                size = p.stat().st_size
+                entries.append(FileEntry(
+                    name=p.name,
+                    path=rel_str,
+                    type="file",
+                    size=size,
+                    is_binary=_is_binary(p),
+                ))
+        return FileListResponse(root=work_dir.name, entries=entries)
+
+    @r.get("/files/{path:path}", response_model=FileContentResponse)
+    async def get_file_content(path: str, task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+
+        try:
+            full = (work_dir / path).resolve()
+            full.relative_to(work_dir.resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+
+        if not full.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        if full.is_dir():
+            raise HTTPException(status_code=400, detail="Path is a directory")
+
+        size = full.stat().st_size
+        is_bin = _is_binary(full)
+        if is_bin:
+            return FileContentResponse(path=path, content="", size=size, is_binary=True)
+
+        with open(full, encoding="utf-8", errors="replace") as f:
+            content = f.read(_MAX_FILE_BYTES)
+        if size > _MAX_FILE_BYTES:
+            content = "[TRUNCATED — file exceeds 500 KB. Use Download to access the full file.]\n\n" + content
+        return FileContentResponse(path=path, content=content, size=size, is_binary=False)
+
+    @r.get("/diff", response_model=DiffListResponse)
+    async def list_diff(task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+        return await asyncio.to_thread(_build_diff_list, work_dir)
+
+    @r.get("/diff/{path:path}", response_model=FileDiffResponse)
+    async def get_file_diff(path: str, task_id: str | None = None):
+        work_dir = _resolve_work_dir(task_id)
+        try:
+            (work_dir / path).resolve().relative_to(work_dir.resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+        return await asyncio.to_thread(_build_file_diff, work_dir, path)
+
     return r
 
 
@@ -256,6 +434,123 @@ def _push_sync(work_dir: str, authenticated_url: str) -> tuple[str, str]:
 
     repo.remote("origin").push(refspec=f"{branch_name}:{branch_name}")
     return branch_name, authenticated_url
+
+
+def _build_diff_list(work_dir: Path) -> DiffListResponse:
+    """Compute the list of changed files vs HEAD. Runs in executor thread."""
+    import git as gitpython
+
+    try:
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+    except gitpython.exc.InvalidGitRepositoryError:
+        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+
+    entries: list[DiffFileEntry] = []
+    total_additions = 0
+    total_deletions = 0
+
+    if repo.head.is_valid():
+        numstat = repo.git.diff("HEAD", "--numstat", "--find-renames")
+        if numstat:
+            for line in numstat.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 3:
+                    continue
+                add_str, del_str = parts[0], parts[1]
+                file_part = "\t".join(parts[2:])
+
+                additions = 0 if add_str == "-" else int(add_str)
+                deletions = 0 if del_str == "-" else int(del_str)
+
+                if " => " in file_part:
+                    if file_part.startswith("{") and "}" in file_part:
+                        brace_end = file_part.index("}")
+                        brace_content = file_part[1:brace_end]
+                        suffix = file_part[brace_end + 1:]
+                        if " => " in brace_content:
+                            old_dir, new_dir = brace_content.split(" => ", 1)
+                            old_path = (old_dir + suffix).lstrip("/")
+                            new_path = (new_dir + suffix).lstrip("/")
+                        else:
+                            old_path = new_path = file_part
+                    else:
+                        old_path, new_path = file_part.split(" => ", 1)
+                    entries.append(DiffFileEntry(
+                        path=new_path.strip(),
+                        change_type="renamed",
+                        additions=additions,
+                        deletions=deletions,
+                        old_path=old_path.strip(),
+                    ))
+                else:
+                    path = file_part
+                    change_type = "deleted" if not (work_dir / path).exists() else "modified"
+                    entries.append(DiffFileEntry(
+                        path=path,
+                        change_type=change_type,
+                        additions=additions,
+                        deletions=deletions,
+                    ))
+
+                total_additions += additions
+                total_deletions += deletions
+
+    # Append untracked files
+    for rel_path in repo.untracked_files:
+        full = work_dir / rel_path
+        if _is_binary(full):
+            additions = 0
+        else:
+            try:
+                additions = len(full.read_text(errors="replace").splitlines())
+            except OSError:
+                additions = 0
+        entries.append(DiffFileEntry(
+            path=rel_path,
+            change_type="added",
+            additions=additions,
+            deletions=0,
+        ))
+        total_additions += additions
+
+    return DiffListResponse(
+        changed_files=entries,
+        total_additions=total_additions,
+        total_deletions=total_deletions,
+    )
+
+
+def _build_file_diff(work_dir: Path, path: str) -> FileDiffResponse:
+    """Return unified diff for a single file vs HEAD. Runs in executor thread."""
+    import git as gitpython
+
+    try:
+        repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
+    except gitpython.exc.InvalidGitRepositoryError:
+        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+
+    if path in repo.untracked_files:
+        full = work_dir / path
+        if _is_binary(full):
+            return FileDiffResponse(path=path, diff="", is_new_file=True)
+        try:
+            text = full.read_text(errors="replace")
+        except OSError:
+            return FileDiffResponse(path=path, diff="", is_new_file=True)
+        lines = text.splitlines()
+        n = len(lines)
+        diff_parts = [f"--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{n} @@"]
+        diff_parts.extend(f"+{line}" for line in lines)
+        return FileDiffResponse(path=path, diff="\n".join(diff_parts), is_new_file=True)
+
+    if not repo.head.is_valid():
+        raise HTTPException(status_code=404, detail="No diff found")
+
+    diff_text = repo.git.diff("HEAD", "--", path)
+    if not diff_text:
+        raise HTTPException(status_code=404, detail="No diff found")
+
+    return FileDiffResponse(path=path, diff=diff_text, is_new_file=False)
 
 
 async def _execute_work(req: WorkRequest, work_dir: Path, db_session_factory) -> None:
