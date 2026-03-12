@@ -125,7 +125,7 @@ export function TaskForm({
           }}
         >
           <SelectTrigger id="task-type-select" aria-label="Task type">
-            <SelectValue />
+            <SelectValue placeholder="Select a task type" />
           </SelectTrigger>
           <SelectContent>
             {TASK_TYPE_OPTIONS.map((opt) => (
