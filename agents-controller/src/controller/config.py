@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     POLL_INTERVAL_SECONDS: int = 10
     HEARTBEAT_TIMEOUT_SECONDS: int = 60
     LEASE_TTL_SECONDS: int = 300
+    SANDBOX_HEARTBEAT_TIMEOUT_SECONDS: int = 60
 
     model_config = SettingsConfigDict(env_file=".env")
 
