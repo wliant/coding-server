@@ -459,6 +459,35 @@
         }
       }
     },
+    "/sandboxes": {
+      "get": {
+        "tags": [
+          "sandboxes"
+        ],
+        "summary": "List Sandboxes",
+        "description": "Returns all sandboxes registered with the Controller, including status, labels, and last heartbeat time.",
+        "operationId": "listSandboxesSandboxesGet",
+        "responses": {
+          "200": {
+            "description": "List of registered sandboxes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SandboxStatus"
+                  },
+                  "title": "Sandboxes"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Controller is unreachable"
+          }
+        }
+      }
+    },
     "/workers": {
       "get": {
         "tags": [
@@ -1213,6 +1242,55 @@
           "status"
         ],
         "title": "CleanupResponse",
+        "type": "object"
+      },
+      "SandboxStatus": {
+        "properties": {
+          "sandbox_id": {
+            "type": "string",
+            "title": "Sandbox Id"
+          },
+          "sandbox_url": {
+            "type": "string",
+            "title": "Sandbox Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "free",
+              "allocated",
+              "unavailable",
+              "unreachable"
+            ],
+            "title": "Status"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "default": []
+          },
+          "registered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Registered At"
+          },
+          "last_heartbeat_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Heartbeat At"
+          }
+        },
+        "required": [
+          "sandbox_id",
+          "sandbox_url",
+          "status",
+          "registered_at",
+          "last_heartbeat_at"
+        ],
+        "title": "SandboxStatus",
         "type": "object"
       },
       "WorkerStatus": {

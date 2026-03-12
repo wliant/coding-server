@@ -1,11 +1,12 @@
 """Controller REST API routes."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from controller.registry import WorkerRegistry, WorkerStatus
+from controller.registry import WorkerRegistry
+from controller.sandbox_registry import SandboxRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,38 @@ class WorkerStatusResponse(BaseModel):
     last_heartbeat_at: datetime
 
 
-def make_router(registry: WorkerRegistry, on_completion_callback=None) -> APIRouter:
+class SandboxRegisterRequest(BaseModel):
+    sandbox_id: str
+    sandbox_url: str
+    labels: list[str] = []
+
+
+class SandboxRegisterResponse(BaseModel):
+    sandbox_id: str
+
+
+class SandboxHeartbeatRequest(BaseModel):
+    status: str
+
+
+class SandboxHeartbeatResponse(BaseModel):
+    acknowledged: bool
+
+
+class SandboxStatusResponse(BaseModel):
+    sandbox_id: str
+    sandbox_url: str
+    status: str
+    labels: list[str]
+    registered_at: datetime
+    last_heartbeat_at: datetime
+
+
+def make_router(
+    registry: WorkerRegistry,
+    on_completion_callback=None,
+    sandbox_registry: SandboxRegistry | None = None,
+) -> APIRouter:
     r = APIRouter()
 
     @r.get("/health")
@@ -99,5 +131,47 @@ def make_router(registry: WorkerRegistry, on_completion_callback=None) -> APIRou
             )
             for w in workers
         ]
+
+    # --- Sandbox endpoints ---
+    if sandbox_registry is not None:
+        @r.post("/sandboxes/register", response_model=SandboxRegisterResponse)
+        async def register_sandbox(req: SandboxRegisterRequest):
+            sandbox_id = await sandbox_registry.register(
+                req.sandbox_id, req.sandbox_url, req.labels
+            )
+            logger.info(
+                "sandbox_registered",
+                extra={
+                    "event": "sandbox_registered",
+                    "sandbox_id": sandbox_id,
+                    "sandbox_url": req.sandbox_url,
+                    "labels": req.labels,
+                },
+            )
+            return SandboxRegisterResponse(sandbox_id=sandbox_id)
+
+        @r.post("/sandboxes/{sandbox_id}/heartbeat", response_model=SandboxHeartbeatResponse)
+        async def sandbox_heartbeat(sandbox_id: str, req: SandboxHeartbeatRequest):
+            success = await sandbox_registry.heartbeat(sandbox_id, req.status)
+            if not success:
+                raise HTTPException(
+                    status_code=404, detail="Sandbox not found — re-registration required"
+                )
+            return SandboxHeartbeatResponse(acknowledged=True)
+
+        @r.get("/sandboxes", response_model=list[SandboxStatusResponse])
+        async def list_sandboxes():
+            sandboxes = await sandbox_registry.get_all()
+            return [
+                SandboxStatusResponse(
+                    sandbox_id=s.sandbox_id,
+                    sandbox_url=s.sandbox_url,
+                    status=s.status,
+                    labels=s.labels,
+                    registered_at=s.registered_at,
+                    last_heartbeat_at=s.last_heartbeat_at,
+                )
+                for s in sandboxes
+            ]
 
     return r
