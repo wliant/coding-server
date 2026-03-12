@@ -27,12 +27,13 @@ export default function NewTaskPage() {
     try {
       const result = await createTaskTasksPost({
         body: {
-          project_type: data.project_type,
+          task_type: data.task_type,
           project_name: data.project_name ?? null,
           agent_id: data.agent_id,
           git_url: data.git_url ?? null,
           branch: data.branch ?? null,
           requirements: data.requirements,
+          commits_to_review: data.commits_to_review ?? null,
         },
       });
 

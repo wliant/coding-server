@@ -20,7 +20,7 @@ def _create_task(http: httpx.Client, agent_id: str) -> str:
     r = http.post(
         f"{API_URL}/tasks",
         json={
-            "project_type": "new",
+            "task_type": "scaffold_project",
             "project_name": "E2E Source Code Browser",
             "agent_id": agent_id,
             "requirements": "e2e source code browser test",

@@ -9,9 +9,18 @@ import { PushToRemoteButton } from "@/components/tasks/PushToRemoteButton";
 import { SourceCodeSection } from "@/components/tasks/SourceCodeSection";
 import { initiateCleanupTasksTaskIdCleanupPost, getTaskDetail } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
-import type { TaskDetailResponse } from "@/client/types.gen";
+import type { TaskDetailResponse, TaskType } from "@/client/types.gen";
 
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
+
+const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  build_feature: "Build a Feature",
+  fix_bug: "Fix a Bug",
+  review_code: "Review Code",
+  refactor_code: "Refactor Code",
+  write_tests: "Write Tests",
+  scaffold_project: "Scaffold a Project",
+};
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -85,7 +94,12 @@ export default function TaskDetailPage() {
       <div className="rounded-lg border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground font-mono">{task.id}</span>
-          <StatusBadge status={task.status} />
+          <div className="flex items-center gap-2">
+            <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
+              {TASK_TYPE_LABELS[task.task_type] ?? task.task_type}
+            </span>
+            <StatusBadge status={task.status} />
+          </div>
         </div>
 
         <div>
@@ -118,6 +132,12 @@ export default function TaskDetailPage() {
             <div>
               <p className="font-medium text-muted-foreground mb-1">Completed</p>
               <p>{formatDate(task.completed_at)}</p>
+            </div>
+          )}
+          {task.commits_to_review != null && (
+            <div>
+              <p className="font-medium text-muted-foreground mb-1">Commits to Review</p>
+              <p>{task.commits_to_review}</p>
             </div>
           )}
           {task.work_directory_path && (

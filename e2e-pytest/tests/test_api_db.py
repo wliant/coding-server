@@ -14,15 +14,16 @@ async def test_list_tasks_count_matches_db(http: httpx.Client, db: asyncpg.Conne
 
 
 async def test_create_task_persisted_in_db(http: httpx.Client, db: asyncpg.Connection):
-    projects_r = http.get(f"{API_URL}/projects")
-    projects = projects_r.json()
-    if not projects:
-        pytest.skip("No projects available")
+    agents_r = http.get(f"{API_URL}/agents")
+    agents = agents_r.json()
+    if not agents:
+        pytest.skip("No agents available")
 
     payload = {
-        "project_id": projects[0]["id"],
-        "description": "e2e-pytest smoke test task",
-        "branch": "main",
+        "task_type": "build_feature",
+        "agent_id": agents[0]["id"],
+        "git_url": "https://github.com/example/repo.git",
+        "requirements": "e2e-pytest smoke test task",
     }
     r = http.post(f"{API_URL}/tasks", json=payload)
     assert r.status_code == 201
@@ -30,5 +31,6 @@ async def test_create_task_persisted_in_db(http: httpx.Client, db: asyncpg.Conne
 
     row = await db.fetchrow("SELECT * FROM jobs WHERE id = $1", task_id)
     assert row is not None
-    assert row["description"] == payload["description"]
+    assert row["requirement"] == payload["requirements"]
     assert row["status"] == "pending"
+    assert row["task_type"] == "build_feature"

@@ -713,13 +713,17 @@
         ],
         "title": "TaskStatus"
       },
-      "ProjectType": {
+      "TaskType": {
         "type": "string",
         "enum": [
-          "new",
-          "existing"
+          "build_feature",
+          "fix_bug",
+          "review_code",
+          "refactor_code",
+          "write_tests",
+          "scaffold_project"
         ],
-        "title": "ProjectType"
+        "title": "TaskType"
       },
       "TaskResponse": {
         "properties": {
@@ -750,6 +754,9 @@
           "status": {
             "$ref": "#/components/schemas/TaskStatus"
           },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -778,6 +785,7 @@
           "project",
           "requirements",
           "status",
+          "task_type",
           "created_at",
           "updated_at"
         ],
@@ -918,6 +926,22 @@
             "title": "Assigned Worker Url",
             "description": "Internal URL of the worker assigned to this task",
             "default": null
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "commits_to_review": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commits To Review",
+            "description": "Number of recent commits to review (only for review_code tasks)",
+            "default": null
           }
         },
         "type": "object",
@@ -926,6 +950,7 @@
           "project",
           "requirements",
           "status",
+          "task_type",
           "created_at",
           "updated_at"
         ],
@@ -974,8 +999,8 @@
       },
       "CreateTaskRequest": {
         "properties": {
-          "project_type": {
-            "$ref": "#/components/schemas/ProjectType"
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
           },
           "project_name": {
             "anyOf": [
@@ -988,7 +1013,7 @@
               }
             ],
             "title": "Project Name",
-            "description": "Required when project_type is \"new\". Not required to be unique."
+            "description": "Required for scaffold_project tasks. Not required to be unique."
           },
           "agent_id": {
             "type": "string",
@@ -1006,7 +1031,7 @@
               }
             ],
             "title": "Git Url",
-            "description": "Remote git repository URL. Required when project_type is 'existing'. Optional for new projects."
+            "description": "Remote git repository URL. Required for all task types except scaffold_project."
           },
           "requirements": {
             "type": "string",
@@ -1024,13 +1049,26 @@
               }
             ],
             "title": "Branch",
-            "description": "Git branch to clone and check out. Created from default branch if it doesn't exist remotely. Null = use default branch.",
+            "description": "Git branch to clone and check out. Required for review_code. Optional for other types. Null = use default branch.",
+            "default": null
+          },
+          "commits_to_review": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commits To Review",
+            "description": "Number of recent commits to review. Only valid for review_code tasks.",
             "default": null
           }
         },
         "type": "object",
         "required": [
-          "project_type",
+          "task_type",
           "agent_id",
           "requirements"
         ],

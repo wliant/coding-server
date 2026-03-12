@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +41,8 @@ class Job(Base):
     branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     assigned_worker_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     assigned_worker_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    task_type: Mapped[str] = mapped_column(String(30), nullable=False, default="build_feature")
+    commits_to_review: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class WorkDirectory(Base):

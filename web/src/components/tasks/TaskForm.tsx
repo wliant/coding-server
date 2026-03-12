@@ -11,15 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AgentResponse } from "@/client/types.gen";
+import type { AgentResponse, TaskType } from "@/client/types.gen";
 
 export interface TaskFormValues {
-  project_type: "new" | "existing";
+  task_type: TaskType;
   project_name?: string;
   agent_id: string;
   git_url?: string;
   branch?: string;
   requirements: string;
+  commits_to_review?: number;
 }
 
 interface TaskFormProps {
@@ -29,8 +30,26 @@ interface TaskFormProps {
   isSubmitting?: boolean;
 }
 
+const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
+  { value: "build_feature", label: "Build a Feature" },
+  { value: "fix_bug", label: "Fix a Bug" },
+  { value: "review_code", label: "Review Code" },
+  { value: "refactor_code", label: "Refactor Code" },
+  { value: "write_tests", label: "Write Tests" },
+  { value: "scaffold_project", label: "Scaffold a Project" },
+];
+
+const REQUIREMENTS_CONFIG: Record<TaskType, { label: string; placeholder: string }> = {
+  build_feature: { label: "Feature Description", placeholder: "Describe the feature to build..." },
+  fix_bug: { label: "Bug Description", placeholder: "Describe the bug to fix..." },
+  review_code: { label: "Review Instructions", placeholder: "What should the review focus on?" },
+  refactor_code: { label: "Refactoring Goals", placeholder: "Describe what to refactor..." },
+  write_tests: { label: "Testing Requirements", placeholder: "Describe what tests to write..." },
+  scaffold_project: { label: "Project Description", placeholder: "Describe the project to scaffold..." },
+};
+
 const DEFAULT_VALUES: TaskFormValues = {
-  project_type: "new",
+  task_type: "build_feature",
   project_name: "",
   agent_id: "",
   git_url: "",
@@ -46,73 +65,80 @@ export function TaskForm({
 }: TaskFormProps) {
   const merged = { ...DEFAULT_VALUES, ...initialValues };
 
-  const [projectType, setProjectType] = useState<"new" | "existing">(
-    merged.project_type
-  );
-  const [projectName, setProjectName] = useState<string>(
-    merged.project_name ?? ""
-  );
+  const [taskType, setTaskType] = useState<TaskType>(merged.task_type);
+  const [projectName, setProjectName] = useState<string>(merged.project_name ?? "");
   const [agentId, setAgentId] = useState<string>(merged.agent_id ?? "");
   const [gitUrl, setGitUrl] = useState<string>(merged.git_url ?? "");
   const [branch, setBranch] = useState<string>(merged.branch ?? "");
-  const [requirements, setRequirements] = useState<string>(
-    merged.requirements
+  const [requirements, setRequirements] = useState<string>(merged.requirements);
+  const [commitsToReview, setCommitsToReview] = useState<string>(
+    merged.commits_to_review != null ? String(merged.commits_to_review) : ""
   );
 
-  const isExisting = projectType === "existing";
+  const isScaffold = taskType === "scaffold_project";
+  const isReview = taskType === "review_code";
 
-  const isProjectNameValid = !isExisting ? projectName.trim().length > 0 : true;
-  const isGitUrlValid = isExisting ? gitUrl.trim().length > 0 : true;
+  const isProjectNameValid = isScaffold ? projectName.trim().length > 0 : true;
+  const isGitUrlValid = isScaffold ? true : gitUrl.trim().length > 0;
+  const isBranchValid = isReview ? branch.trim().length > 0 : true;
   const isAgentSelected = agentId.trim().length > 0;
   const isRequirementsValid = requirements.trim().length > 0;
   const isFormValid =
-    isProjectNameValid && isGitUrlValid && isAgentSelected && isRequirementsValid;
+    isProjectNameValid && isGitUrlValid && isBranchValid && isAgentSelected && isRequirementsValid;
+
+  const reqConfig = REQUIREMENTS_CONFIG[taskType];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid || isSubmitting) return;
 
     const data: TaskFormValues = {
-      project_type: projectType,
-      project_name: isExisting ? undefined : projectName.trim(),
+      task_type: taskType,
+      project_name: isScaffold ? projectName.trim() : undefined,
       agent_id: agentId,
       git_url: gitUrl.trim() || undefined,
       branch: branch.trim() || undefined,
       requirements,
     };
 
+    if (isReview && commitsToReview.trim()) {
+      data.commits_to_review = parseInt(commitsToReview, 10);
+    }
+
     await onSubmit(data);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-      {/* Project Type */}
+      {/* Task Type */}
       <div className="space-y-2">
         <label
-          htmlFor="project-type-select"
+          htmlFor="task-type-select"
           className="block text-sm font-medium text-foreground"
         >
-          Project
+          Task Type <span className="text-red-500">*</span>
         </label>
         <Select
-          value={projectType}
+          value={taskType}
           onValueChange={(v) => {
-            setProjectType(v as "new" | "existing");
-            setGitUrl("");
+            setTaskType(v as TaskType);
           }}
         >
-          <SelectTrigger id="project-type-select" aria-label="Project type">
+          <SelectTrigger id="task-type-select" aria-label="Task type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="new">New Project</SelectItem>
-            <SelectItem value="existing">Existing Project</SelectItem>
+            {TASK_TYPE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Project Name — only for new projects */}
-      {!isExisting && (
+      {/* Project Name — only for scaffold_project */}
+      {isScaffold && (
         <div className="space-y-2">
           <label
             htmlFor="project-name-input"
@@ -136,7 +162,7 @@ export function TaskForm({
           htmlFor="git-url-input"
           className="block text-sm font-medium text-foreground"
         >
-          Git URL{isExisting && <span className="text-red-500"> *</span>}
+          Git URL{!isScaffold && <span className="text-red-500"> *</span>}
         </label>
         <Input
           id="git-url-input"
@@ -147,14 +173,14 @@ export function TaskForm({
         />
       </div>
 
-      {/* Branch (only for existing projects) */}
-      {isExisting && (
+      {/* Branch — shown for non-scaffold tasks */}
+      {!isScaffold && (
         <div className="space-y-2">
           <label
             htmlFor="branch-input"
             className="block text-sm font-medium text-foreground"
           >
-            Branch (optional)
+            Branch{isReview ? <span className="text-red-500"> *</span> : " (optional)"}
           </label>
           <Input
             id="branch-input"
@@ -162,6 +188,27 @@ export function TaskForm({
             placeholder="e.g. main or feature/my-feature"
             value={branch}
             onChange={(e) => setBranch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Commits to Review — only for review_code */}
+      {isReview && (
+        <div className="space-y-2">
+          <label
+            htmlFor="commits-to-review-input"
+            className="block text-sm font-medium text-foreground"
+          >
+            Commits to Review (optional)
+          </label>
+          <Input
+            id="commits-to-review-input"
+            aria-label="Commits to Review"
+            type="number"
+            min="1"
+            placeholder="e.g. 5"
+            value={commitsToReview}
+            onChange={(e) => setCommitsToReview(e.target.value)}
           />
         </div>
       )}
@@ -194,12 +241,12 @@ export function TaskForm({
           htmlFor="requirements-textarea"
           className="block text-sm font-medium text-foreground"
         >
-          Requirements <span className="text-red-500">*</span>
+          {reqConfig.label} <span className="text-red-500">*</span>
         </label>
         <Textarea
           id="requirements-textarea"
-          aria-label="Requirements"
-          placeholder="Describe what you want to build..."
+          aria-label={reqConfig.label}
+          placeholder={reqConfig.placeholder}
           value={requirements}
           onChange={(e) => setRequirements(e.target.value)}
           rows={6}

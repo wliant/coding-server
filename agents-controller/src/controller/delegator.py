@@ -203,6 +203,8 @@ async def _delegate_pending_tasks(
             "branch": job.branch,
             "github_token": github_token,
             "llm_config": llm_config,
+            "task_type": job.task_type,
+            "commits_to_review": job.commits_to_review,
         }
 
         try:

@@ -27,7 +27,7 @@ async def create_task(
 
     Returns (job, project, agent | None) tuple.
     """
-    source_type = req.project_type.value  # "new" or "existing"
+    source_type = "new" if req.task_type.value == "scaffold_project" else "existing"
     project = await create_project(db, source_type=source_type)
     if req.project_name:
         project.name = req.project_name
@@ -40,6 +40,8 @@ async def create_task(
         requirement=req.requirements,
         agent_id=req.agent_id,
         branch=req.branch,
+        task_type=req.task_type.value,
+        commits_to_review=req.commits_to_review,
         status="pending",
         updated_at=now,
     )

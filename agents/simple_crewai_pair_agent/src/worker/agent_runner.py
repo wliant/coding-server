@@ -35,6 +35,8 @@ class WorkRequest:
     branch: str | None = None
     github_token: str | None = None
     llm_config: dict | None = None
+    task_type: str = "build_feature"
+    commits_to_review: int | None = None
 
 
 def _resolve_agent_classes():

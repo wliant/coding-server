@@ -65,6 +65,8 @@ class WorkRequest(BaseModel):
     branch: str | None = None
     github_token: str | None = None
     llm_config: LLMConfig
+    task_type: str = "build_feature"
+    commits_to_review: int | None = None
 
 
 class WorkAcceptedResponse(BaseModel):
@@ -580,6 +582,8 @@ async def _execute_work(req: WorkRequest, work_dir: Path, db_session_factory) ->
         github_token=req.github_token,
         llm_config=req.llm_config.model_dump(),
         work_dir=str(work_dir),
+        task_type=req.task_type,
+        commits_to_review=req.commits_to_review,
     )
 
     success, error_msg = await run_coding_agent(agent_req, db_session_factory)

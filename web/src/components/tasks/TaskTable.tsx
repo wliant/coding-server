@@ -9,10 +9,19 @@ import { AbortConfirmDialog } from "./AbortConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { updateTaskTasksTaskIdPatch } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
-import type { TaskResponse } from "@/client/types.gen";
+import type { TaskResponse, TaskType } from "@/client/types.gen";
 
 // Configure the client base URL
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
+
+const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  build_feature: "Build Feature",
+  fix_bug: "Fix Bug",
+  review_code: "Review Code",
+  refactor_code: "Refactor",
+  write_tests: "Write Tests",
+  scaffold_project: "Scaffold",
+};
 
 interface TaskTableProps {
   tasks: TaskResponse[];
@@ -114,6 +123,7 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Project</th>
+                <th className="px-4 py-3 text-left font-medium">Type</th>
                 <th className="px-4 py-3 text-left font-medium">Agent</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Submitted</th>
@@ -132,6 +142,11 @@ export function TaskTable({ tasks: initialTasks }: TaskTableProps) {
                         {task.requirements}
                       </div>
                     </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
+                      {TASK_TYPE_LABELS[task.task_type] ?? task.task_type}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {task.agent?.display_name ?? "—"}

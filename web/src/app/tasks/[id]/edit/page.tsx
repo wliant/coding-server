@@ -72,7 +72,7 @@ export default function EditTaskPage() {
   if (!task) return null;
 
   const initialValues: TaskFormValues = {
-    project_type: task.project.source_type === "existing" ? "existing" : "new",
+    task_type: task.task_type,
     project_name: task.project.name ?? "",
     agent_id: task.agent?.id ?? "",
     git_url: task.project.git_url ?? "",

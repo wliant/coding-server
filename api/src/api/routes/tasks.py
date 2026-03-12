@@ -42,6 +42,7 @@ def _task_to_response(job: Job, project: Project, agent: Agent | None) -> TaskRe
         agent=AgentSummary.model_validate(agent) if agent else None,
         requirements=job.requirement,
         status=TaskStatus(job.status),
+        task_type=job.task_type,
         created_at=created_at,
         updated_at=updated_at,
         error_message=job.error_message,
@@ -80,6 +81,8 @@ def _task_to_detail_response(
         branch=job.branch,
         assigned_worker_id=job.assigned_worker_id,
         assigned_worker_url=job.assigned_worker_url,
+        task_type=job.task_type,
+        commits_to_review=job.commits_to_review,
     )
 
 
