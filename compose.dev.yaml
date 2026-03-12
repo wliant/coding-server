@@ -100,6 +100,7 @@ services:
       - "${SANDBOX_PORT:-8006}:8006"
     volumes:
       - ./sandbox/src:/app/src
+      - ./sandbox/tests:/app/tests
     environment:
       PYTHONPATH: /app/src
       CORS_ORIGINS: "http://localhost:3000"
