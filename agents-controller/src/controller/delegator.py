@@ -9,9 +9,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from controller.config import settings
-from controller.models import Agent, Job, Project, Sandbox
+from controller.models import Agent, Job, Project
 from controller.registry import WorkerRegistry
-from controller.sandbox_registry import SandboxRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -324,42 +323,10 @@ async def process_task_completion(
     return updated is not None
 
 
-async def _reap_unreachable_sandboxes(
-    sandbox_registry: SandboxRegistry, db: AsyncSession, timeout_seconds: int
-) -> None:
-    """Mark stale sandboxes as unreachable."""
-    stale = await sandbox_registry.get_stale_sandboxes(timeout_seconds)
-    for rec in stale:
-        logger.warning(
-            "sandbox_unreachable",
-            extra={
-                "event": "sandbox_unreachable",
-                "sandbox_id": rec.sandbox_id,
-                "last_heartbeat_ago": (
-                    datetime.now(timezone.utc) - rec.last_heartbeat_at
-                ).total_seconds(),
-            },
-        )
-        await sandbox_registry.mark_unreachable(rec.sandbox_id)
-
-        # Update DB status
-        await db.execute(
-            update(Sandbox)
-            .where(Sandbox.sandbox_id == rec.sandbox_id)
-            .values(
-                status="unreachable",
-                updated_at=datetime.now(timezone.utc),
-            )
-        )
-    if stale:
-        await db.commit()
-
-
 async def run_poll_cycle(
     registry: WorkerRegistry,
     session_factory: async_sessionmaker,
     cfg,
-    sandbox_registry: SandboxRegistry | None = None,
 ) -> None:
     """Execute one complete poll cycle."""
     async with session_factory() as db:
@@ -367,23 +334,18 @@ async def run_poll_cycle(
         await _renew_active_leases(registry, db, cfg.LEASE_TTL_SECONDS)
         await _handle_cleaning_up_tasks(registry, db)
         await _delegate_pending_tasks(registry, db, cfg.LEASE_TTL_SECONDS)
-        if sandbox_registry is not None:
-            await _reap_unreachable_sandboxes(
-                sandbox_registry, db, cfg.SANDBOX_HEARTBEAT_TIMEOUT_SECONDS
-            )
 
 
 async def delegator_loop(
     registry: WorkerRegistry,
     session_factory: async_sessionmaker,
     cfg,
-    sandbox_registry: SandboxRegistry | None = None,
 ) -> None:
     """Main delegator polling loop."""
     logger.info("delegator_started", extra={"event": "delegator_started"})
     while True:
         try:
-            await run_poll_cycle(registry, session_factory, cfg, sandbox_registry)
+            await run_poll_cycle(registry, session_factory, cfg)
         except Exception as exc:
             logger.error(
                 "poll_cycle_error",

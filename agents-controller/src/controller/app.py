@@ -11,7 +11,6 @@ from controller.config import settings
 from controller.delegator import delegator_loop, process_task_completion
 from controller.registry import WorkerRegistry
 from controller.routes import make_router
-from controller.sandbox_registry import SandboxRegistry
 
 
 def _configure_logging() -> None:
@@ -28,13 +27,10 @@ def _configure_logging() -> None:
 def create_app(
     registry: WorkerRegistry | None = None,
     on_completion_callback=None,
-    sandbox_registry: SandboxRegistry | None = None,
 ) -> FastAPI:
     """Factory function — allows test injection of a custom registry and callback."""
     if registry is None:
         registry = WorkerRegistry()
-    if sandbox_registry is None:
-        sandbox_registry = SandboxRegistry()
 
     engine = create_async_engine(settings.DATABASE_URL)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -51,9 +47,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         _configure_logging()
-        task = asyncio.create_task(
-            delegator_loop(registry, session_factory, settings, sandbox_registry)
-        )
+        task = asyncio.create_task(delegator_loop(registry, session_factory, settings))
         logging.getLogger(__name__).info(
             "controller_started", extra={"event": "controller_started"}
         )
@@ -65,11 +59,7 @@ def create_app(
         )
 
     app = FastAPI(title="Agent Controller", version="1.0.0", lifespan=lifespan)
-    router = make_router(
-        registry=registry,
-        on_completion_callback=on_completion_callback,
-        sandbox_registry=sandbox_registry,
-    )
+    router = make_router(registry=registry, on_completion_callback=on_completion_callback)
     app.include_router(router)
     return app
 

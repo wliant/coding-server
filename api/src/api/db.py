@@ -6,7 +6,6 @@ from api.models.project import Base  # noqa: F401 — ensures models are registe
 from api.models.job import Job, WorkDirectory  # noqa: F401
 from api.models.setting import Setting  # noqa: F401
 from api.models.agent import Agent  # noqa: F401
-from api.models.sandbox import Sandbox  # noqa: F401
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/madm")
 

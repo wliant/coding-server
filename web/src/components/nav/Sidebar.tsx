@@ -8,7 +8,6 @@ const navLinks = [
   { href: "/tasks", label: "Task List" },
   { href: "/tasks/new", label: "Submit Task" },
   { href: "/workers", label: "Workers" },
-  { href: "/sandboxes", label: "Sandboxes" },
   { href: "/settings", label: "Settings" },
 ];
 

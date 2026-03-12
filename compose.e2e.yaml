@@ -31,12 +31,6 @@ services:
     env_file:
       - .env.e2e
 
-  sandbox:
-    ports:
-      - "${SANDBOX_PORT:-8105}:8005"
-    env_file:
-      - .env.e2e
-
   web:
     ports:
       - "${WEB_PORT:-3100}:3000"
@@ -75,7 +69,6 @@ services:
       API_URL: http://api:8000
       WORKER_URL: http://simple_crewai_pair_agent:8001
       TOOLS_URL: http://tools:8002
-      SANDBOX_URL: http://sandbox:8005
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/madm
       COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-madm_e2e}
     networks:
@@ -88,7 +81,5 @@ services:
       simple_crewai_pair_agent:
         condition: service_healthy
       tools:
-        condition: service_healthy
-      sandbox:
         condition: service_healthy
     restart: "no"
