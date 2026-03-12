@@ -192,6 +192,29 @@ services:
       timeout: 5s
       retries: 5
 
+  sandbox:
+    build:
+      context: ./sandbox
+    expose:
+      - "8006"
+    environment:
+      CONTROLLER_URL: http://controller:8003
+      SANDBOX_PORT: "8006"
+      LABELS: "python,git"
+      WORKSPACE_DIR: /workspace
+      HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-15}
+      SANDBOX_ID: ${SANDBOX_ID:-}
+    networks:
+      - backend
+    depends_on:
+      controller:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build:
       context: .

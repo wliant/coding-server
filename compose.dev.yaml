@@ -95,6 +95,17 @@ services:
     env_file:
       - .env
 
+  sandbox:
+    ports:
+      - "${SANDBOX_PORT:-8006}:8006"
+    volumes:
+      - ./sandbox/src:/app/src
+    environment:
+      PYTHONPATH: /app/src
+      CORS_ORIGINS: "http://localhost:3000"
+    env_file:
+      - .env
+
   web:
     build:
       context: .
