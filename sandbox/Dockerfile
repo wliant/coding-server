@@ -17,6 +17,7 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir ".[dev]"
 
 USER appuser
-EXPOSE 8005
+EXPOSE 8006
 
-CMD ["uvicorn", "sandbox.app:app", "--host", "0.0.0.0", "--port", "8005"]
+ENV SANDBOX_PORT=8006
+CMD ["sh", "-c", "uvicorn sandbox.app:app --host 0.0.0.0 --port ${SANDBOX_PORT}"]
