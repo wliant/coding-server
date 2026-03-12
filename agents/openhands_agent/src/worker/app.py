@@ -1,10 +1,12 @@
 """Worker FastAPI application."""
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -228,6 +230,16 @@ def create_app() -> FastAPI:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     app = FastAPI(title="OpenHands Agent Worker", version="1.0.0", lifespan=lifespan)
+
+    cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     router = make_router(work_dir_base=settings.WORK_DIR, db_session_factory=session_factory)
     app.include_router(router)
     return app

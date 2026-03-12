@@ -91,6 +91,7 @@ services:
       - ./agent-work:/agent-work
     environment:
       PYTHONPATH: /app/src
+      CORS_ORIGINS: "http://localhost:3000"
     env_file:
       - .env
 
