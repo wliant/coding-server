@@ -18,7 +18,13 @@ coding-machine/
 ├── compose.yaml / compose.dev.yaml / compose.e2e.yaml / compose.prod.yaml
 ├── openapi.json          # committed OpenAPI spec (source of truth for client gen)
 ├── Taskfile.yml          # cross-platform task runner
-├── specs/spec.md         # consolidated system specification
+├── specs/                # bounded-context specifications
+│   ├── task-lifecycle/spec.md
+│   ├── orchestration/spec.md
+│   ├── agent-execution/spec.md
+│   ├── source-code-browser/spec.md
+│   ├── git-integration/spec.md
+│   └── platform-infrastructure/spec.md
 ├── web/                  # Next.js 15 web interface
 │   ├── src/
 │   └── tests/
