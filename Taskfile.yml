@@ -93,11 +93,17 @@ tasks:
   test-all:
     desc: Run all pytest suites and web jest suite
     summary: |
-      Runs test-api, test-worker, test-controller, test-tools, test-web, and test-deepagent concurrently.
+      Runs all test suites sequentially to avoid Docker exec contention on Windows.
       Requires the dev environment to be running ('task dev') for the container tests.
       test-web runs on the host and requires Node.js.
       Exit code is non-zero if any suite fails.
-    deps: [test-api, test-worker, test-controller, test-tools, test-web, test-deepagent]
+    cmds:
+      - task: test-api
+      - task: test-worker
+      - task: test-controller
+      - task: test-tools
+      - task: test-deepagent
+      - task: test-web
 
   lint-api:
     desc: Lint OpenAPI spec with Redocly
