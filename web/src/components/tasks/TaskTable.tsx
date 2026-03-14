@@ -9,19 +9,11 @@ import { AbortConfirmDialog } from "./AbortConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { updateTaskTasksTaskIdPatch } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
-import type { TaskResponse, TaskType } from "@/client/types.gen";
+import type { TaskResponse } from "@/client/types.gen";
+import { TASK_TYPE_LABELS } from "@/lib/task-type-labels";
 
 // Configure the client base URL
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
-
-const TASK_TYPE_LABELS: Record<TaskType, string> = {
-  build_feature: "Build Feature",
-  fix_bug: "Fix Bug",
-  review_code: "Review Code",
-  refactor_code: "Refactor",
-  write_tests: "Write Tests",
-  scaffold_project: "Scaffold",
-};
 
 interface TaskTableProps {
   tasks: TaskResponse[];

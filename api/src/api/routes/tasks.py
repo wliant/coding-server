@@ -29,12 +29,8 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 def _task_to_response(job: Job, project: Project, agent: Agent | None) -> TaskResponse:
     """Serialise a Job + Project + optional Agent into a TaskResponse."""
-    updated_at = job.updated_at if job.updated_at else job.created_at
-    created_at = job.created_at
-    if created_at is None:
-        created_at = datetime.now(timezone.utc)
-    if updated_at is None:
-        updated_at = created_at
+    created_at = job.created_at or datetime.now(timezone.utc)
+    updated_at = job.updated_at or created_at
 
     return TaskResponse(
         id=job.id,

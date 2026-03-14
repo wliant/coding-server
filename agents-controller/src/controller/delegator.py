@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import select, update
@@ -71,9 +71,7 @@ async def _renew_active_leases(
                     Job.lease_holder == rec.worker_id,
                 )
                 .values(
-                    lease_expires_at=datetime.fromtimestamp(
-                        now.timestamp() + lease_ttl_seconds, tz=timezone.utc
-                    ),
+                    lease_expires_at=now + timedelta(seconds=lease_ttl_seconds),
                     updated_at=now,
                 )
             )
@@ -169,7 +167,7 @@ async def _delegate_pending_tasks(
 
         # Atomically claim the task
         now = datetime.now(timezone.utc)
-        expires_at = datetime.fromtimestamp(now.timestamp() + lease_ttl_seconds, tz=timezone.utc)
+        expires_at = now + timedelta(seconds=lease_ttl_seconds)
         result2 = await db.execute(
             update(Job)
             .where(Job.id == job.id, Job.status == "pending")

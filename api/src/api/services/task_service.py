@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,8 +118,6 @@ async def trigger_push(
         HTTPException 422: project has no git_url (and none provided)
         HTTPException 502: git push failed
     """
-    import httpx
-
     detail = await get_task_detail(db, task_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -198,8 +197,6 @@ async def download_task_code(db: AsyncSession, task_id: uuid.UUID) -> tuple[byte
     Returns (zip_bytes, filename).
     Raises HTTPException 404 if task not found, 409 if no worker assigned.
     """
-    import httpx
-
     result = await db.execute(select(Job).where(Job.id == task_id))
     job = result.scalar_one_or_none()
     if job is None:

@@ -167,8 +167,7 @@ def _build_ignored_set(work_dir: Path) -> set[str]:
         import git as gitpython
 
         repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
-        ignored = set(repo.ignored(*candidates))
-        return ignored
+        return set(repo.ignored(*candidates))
     except Exception:
         pass
 
@@ -211,7 +210,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
     @r.post("/work", response_model=WorkAcceptedResponse, status_code=202)
     async def issue_work(req: WorkRequest):
         if _state.status != "free":
-            raise HTTPException(status_code=409, detail=f"Worker is not free (status: {_state.status})")
+            raise HTTPException(
+                status_code=409,
+                detail=f"Worker is not free (status: {_state.status})",
+            )
 
         _state.status = "in_progress"
         _state.task_id = req.task_id
@@ -267,7 +269,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
     @r.post("/push", response_model=PushResponse)
     async def push_to_remote(req: PushRequest):
         if _state.status != "completed":
-            raise HTTPException(status_code=409, detail=f"Worker is not completed (status: {_state.status})")
+            raise HTTPException(
+                status_code=409,
+                detail=f"Worker is not completed (status: {_state.status})",
+            )
 
         effective_git_url = req.git_url or _state.git_url
         if not effective_git_url:
@@ -290,10 +295,14 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
                 "push_succeeded",
                 extra={"event": "push_succeeded", "task_id": _state.task_id, "branch": branch_name},
             )
-            return PushResponse(branch_name=branch_name, remote_url=effective_git_url, pushed_at=pushed_at)
+            return PushResponse(
+                branch_name=branch_name,
+                remote_url=effective_git_url,
+                pushed_at=pushed_at,
+            )
         except Exception as exc:
             logger.error("push_failed", extra={"event": "push_failed", "error": str(exc)})
-            raise HTTPException(status_code=502, detail=f"Push failed: {exc}")
+            raise HTTPException(status_code=502, detail=f"Push failed: {exc}") from exc
 
     @r.post("/free", response_model=FreeResponse)
     async def free_worker():
@@ -311,8 +320,14 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
                         extra={"event": "cleanup_succeeded", "path": work_dir},
                     )
                 except Exception as exc:
-                    logger.error("cleanup_failed", extra={"event": "cleanup_failed", "error": str(exc)})
-                    raise HTTPException(status_code=500, detail=f"Failed to delete working directory: {exc}")
+                    logger.error(
+                        "cleanup_failed",
+                        extra={"event": "cleanup_failed", "error": str(exc)},
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to delete working directory: {exc}",
+                    ) from exc
 
         _state.status = "free"
         _state.task_id = None
@@ -329,7 +344,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
             candidate = Path(work_dir_base) / task_id
             if candidate.exists():
                 return candidate
-            raise HTTPException(status_code=404, detail=f"Working directory for task {task_id} not found on disk")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Working directory for task {task_id} not found on disk",
+            )
         if not _state.work_dir_path:
             raise HTTPException(status_code=404, detail="No working directory available")
         work_dir = Path(_state.work_dir_path)
@@ -369,8 +387,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
         try:
             full = (work_dir / path).resolve()
             full.relative_to(work_dir.resolve())  # raises ValueError if outside
-        except ValueError:
-            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=403, detail="Access outside working directory denied"
+            ) from exc
 
         if not full.exists():
             raise HTTPException(status_code=404, detail="File not found")
@@ -385,7 +405,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
         with open(full, encoding="utf-8", errors="replace") as f:
             content = f.read(_MAX_FILE_BYTES)
         if size > _MAX_FILE_BYTES:
-            content = "[TRUNCATED — file exceeds 500 KB. Use Download to access the full file.]\n\n" + content
+            content = (
+                "[TRUNCATED — file exceeds 500 KB. Use Download to access the full file.]\n\n"
+                + content
+            )
         return FileContentResponse(path=path, content=content, size=size, is_binary=False)
 
     @r.get("/diff", response_model=DiffListResponse)
@@ -398,8 +421,10 @@ def make_router(work_dir_base: str, db_session_factory=None) -> APIRouter:
         work_dir = _resolve_work_dir(task_id)
         try:
             (work_dir / path).resolve().relative_to(work_dir.resolve())
-        except ValueError:
-            raise HTTPException(status_code=403, detail="Access outside working directory denied")
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=403, detail="Access outside working directory denied"
+            ) from exc
         return await asyncio.to_thread(_build_file_diff, work_dir, path)
 
     return r
@@ -440,7 +465,7 @@ def _push_sync(work_dir: str, authenticated_url: str) -> tuple[str, str]:
 
     branch_name = repo.active_branch.name
 
-    if "origin" not in [r.name for r in repo.remotes]:
+    if "origin" not in {r.name for r in repo.remotes}:
         repo.create_remote("origin", authenticated_url)
     else:
         repo.remote("origin").set_url(authenticated_url)
@@ -455,8 +480,10 @@ def _build_diff_list(work_dir: Path) -> DiffListResponse:
 
     try:
         repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
-    except gitpython.exc.InvalidGitRepositoryError:
-        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+    except gitpython.exc.InvalidGitRepositoryError as exc:
+        raise HTTPException(
+            status_code=400, detail="Working directory is not a git repository"
+        ) from exc
 
     entries: list[DiffFileEntry] = []
     total_additions = 0
@@ -540,8 +567,10 @@ def _build_file_diff(work_dir: Path, path: str) -> FileDiffResponse:
 
     try:
         repo = gitpython.Repo(str(work_dir), search_parent_directories=False)
-    except gitpython.exc.InvalidGitRepositoryError:
-        raise HTTPException(status_code=400, detail="Working directory is not a git repository")
+    except gitpython.exc.InvalidGitRepositoryError as exc:
+        raise HTTPException(
+            status_code=400, detail="Working directory is not a git repository"
+        ) from exc
 
     # Check if it's an untracked (new) file
     if path in repo.untracked_files:
@@ -554,7 +583,7 @@ def _build_file_diff(work_dir: Path, path: str) -> FileDiffResponse:
             return FileDiffResponse(path=path, diff="", is_new_file=True)
         lines = text.splitlines()
         n = len(lines)
-        diff_parts = [f"--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{n} @@"]
+        diff_parts = ["--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{n} @@"]
         diff_parts.extend(f"+{line}" for line in lines)
         return FileDiffResponse(path=path, diff="\n".join(diff_parts), is_new_file=True)
 
@@ -571,7 +600,8 @@ def _build_file_diff(work_dir: Path, path: str) -> FileDiffResponse:
 
 async def _execute_work(req: WorkRequest, work_dir: Path, db_session_factory) -> None:
     """Background task: run agent and update state."""
-    from worker.agent_runner import run_coding_agent, WorkRequest as AgentWorkRequest
+    from worker.agent_runner import WorkRequest as AgentWorkRequest
+    from worker.agent_runner import run_coding_agent
 
     agent_req = AgentWorkRequest(
         task_id=req.task_id,

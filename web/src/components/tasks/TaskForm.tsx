@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AgentResponse, TaskType } from "@/client/types.gen";
+import { TASK_TYPE_LABELS_LONG } from "@/lib/task-type-labels";
 
 export interface TaskFormValues {
   task_type: TaskType;
@@ -30,14 +31,9 @@ interface TaskFormProps {
   isSubmitting?: boolean;
 }
 
-const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
-  { value: "build_feature", label: "Build a Feature" },
-  { value: "fix_bug", label: "Fix a Bug" },
-  { value: "review_code", label: "Review Code" },
-  { value: "refactor_code", label: "Refactor Code" },
-  { value: "write_tests", label: "Write Tests" },
-  { value: "scaffold_project", label: "Scaffold a Project" },
-];
+const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = (
+  Object.entries(TASK_TYPE_LABELS_LONG) as [TaskType, string][]
+).map(([value, label]) => ({ value, label }));
 
 const REQUIREMENTS_CONFIG: Record<TaskType, { label: string; placeholder: string }> = {
   build_feature: { label: "Feature Description", placeholder: "Describe the feature to build..." },

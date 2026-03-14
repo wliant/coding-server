@@ -67,7 +67,7 @@ def push_working_directory_to_remote(
 
     # Configure or replace the remote
     remote_name = "push_target"
-    if remote_name in [r.name for r in repo.remotes]:
+    if remote_name in {r.name for r in repo.remotes}:
         repo.delete_remote(remote_name)
     remote = repo.create_remote(remote_name, remote_url)
 

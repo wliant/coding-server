@@ -9,18 +9,10 @@ import { PushToRemoteButton } from "@/components/tasks/PushToRemoteButton";
 import { SourceCodeSection } from "@/components/tasks/SourceCodeSection";
 import { initiateCleanupTasksTaskIdCleanupPost, getTaskDetail } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
-import type { TaskDetailResponse, TaskType } from "@/client/types.gen";
+import type { TaskDetailResponse } from "@/client/types.gen";
+import { TASK_TYPE_LABELS_LONG as TASK_TYPE_LABELS } from "@/lib/task-type-labels";
 
 client.setConfig({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" });
-
-const TASK_TYPE_LABELS: Record<TaskType, string> = {
-  build_feature: "Build a Feature",
-  fix_bug: "Fix a Bug",
-  review_code: "Review Code",
-  refactor_code: "Refactor Code",
-  write_tests: "Write Tests",
-  scaffold_project: "Scaffold a Project",
-};
 
 export default function TaskDetailPage() {
   const params = useParams();
