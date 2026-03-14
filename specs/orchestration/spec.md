@@ -1,5 +1,5 @@
 # Orchestration
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Overview
 
@@ -22,7 +22,7 @@ The controller service is the central coordinator that bridges pending tasks in 
 | Status | Meaning |
 |--------|---------|
 | `free` | Registered, available for use |
-| `allocated` | Reserved for future use (not currently implemented) |
+| `allocated` | Assigned to a task, workspace active |
 | `unavailable` | Temporarily unavailable |
 | `unreachable` | Heartbeat timeout exceeded |
 
@@ -30,10 +30,10 @@ The controller service is the central coordinator that bridges pending tasks in 
 
 The controller runs a continuous poll loop (default: every 10 seconds) with four phases executed in order:
 
-1. **Reap unreachable workers/sandboxes** — Mark any worker/sandbox whose last heartbeat exceeds the timeout as `unreachable`; release task leases for unreachable workers so tasks revert to `pending`
+1. **Reap unreachable workers/sandboxes** — Mark any worker/sandbox whose last heartbeat exceeds the timeout as `unreachable`; release task leases for unreachable workers so tasks revert to `pending`; mark stale sandboxes as `unreachable` (`_reap_unreachable_sandboxes`)
 2. **Renew active leases** — Refresh lease expiry for tasks whose assigned workers are still healthy (sending heartbeats)
-3. **Handle cleaning_up tasks** — For tasks in `cleaning_up` status, call the assigned worker's `/free` endpoint to delete the working directory and free the worker
-4. **Delegate pending tasks** — For each pending task, find a free worker matching the task's agent type, atomically claim the task (CAS on status + lease fields), then POST the work payload to the worker's `/work` endpoint
+3. **Handle cleaning_up tasks** — For tasks in `cleaning_up` status: call the assigned worker's `/free` endpoint to delete the working directory and free the worker; if a sandbox is allocated, call `POST {sandbox_url}/reset` to clear the sandbox workspace, then call `sandbox_registry.free_sandbox(sandbox_id)` and clear sandbox fields on the Job
+4. **Delegate pending tasks** — For each pending task, find a free worker matching the task's agent type, atomically claim the task (CAS on status + lease fields); also match `required_capabilities` against sandbox labels via `sandbox_registry.get_free_sandbox_for_capabilities()`; allocate sandbox; include `sandbox_url` and `sandbox_capabilities` in the work payload; update Job with `assigned_sandbox_id` and `assigned_sandbox_url`; then POST the work payload to the worker's `/work` endpoint
 
 ### Lease Pattern
 
@@ -82,12 +82,19 @@ class SandboxRecord:
     sandbox_url: str
     labels: list[str]
     status: str  # free, allocated, unavailable, unreachable
+    current_task_id: str | None
     last_heartbeat_at: datetime
     registered_at: datetime
 ```
 
 - Same pattern as WorkerRegistry (asyncio.Lock, dict, in-memory only)
 - Sandbox registrations are also persisted to the `sandboxes` DB table for UI display
+
+**SandboxRegistry methods:**
+
+- `get_free_sandbox_for_capabilities(required: list[str]) -> SandboxRecord | None` — finds a free sandbox whose `labels` are a superset of `required`
+- `allocate(sandbox_id, task_id)` — marks sandbox as `allocated`, sets `current_task_id`
+- `free_sandbox(sandbox_id)` — returns sandbox to `free` status, clears `current_task_id`
 
 ## API Contracts
 

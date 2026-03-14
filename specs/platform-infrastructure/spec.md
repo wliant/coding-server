@@ -1,5 +1,5 @@
 # Platform Infrastructure
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Overview
 
@@ -65,6 +65,24 @@ A general-purpose Python execution environment providing workspace APIs. Sandbox
 | `GET /download` | GET | Download workspace as zip archive |
 | `POST /execute` | POST | Synchronous command execution → `{exit_code, stdout, stderr}` |
 | `POST /execute/stream` | POST | SSE streaming of command output |
+| `GET /capabilities` | GET | Returns `{"capabilities": ["python", "git", ...]}` |
+| `POST /reset` | POST | Clears workspace directory contents |
+
+**MCP Server:**
+
+FastMCP server mounted at `/mcp` via `http_app()`. Exposes 7 tools:
+
+| Tool | Description |
+|------|-------------|
+| `list_files` | List files in workspace |
+| `read_file` | Read file content |
+| `write_file` | Write file content |
+| `delete_file` | Delete a file |
+| `create_directory` | Create a directory |
+| `run_command` | Execute a shell command |
+| `get_capabilities` | List sandbox capabilities |
+
+Transport: HTTP (Streamable HTTP).
 
 **Key properties:**
 - Containerized: `python:3.12-slim` + `git`, `curl`, `jq`, `build-essential`
@@ -168,6 +186,7 @@ Alembic migrations in `api/alembic/versions/`, sequential numbering:
 | 0011 | Add task_type + commits_to_review to jobs |
 | 0012 | Add openhands_agent to agents seed data |
 | 0013 | Add sandboxes table |
+| 0014 | Add required_capabilities, assigned_sandbox_id, assigned_sandbox_url to jobs |
 
 ## Service Architecture
 

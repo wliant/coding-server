@@ -1,9 +1,9 @@
 # Source Code Browser
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Overview
 
-After a coding agent completes (or fails) a task, the user can browse the generated source code directly in the web UI. The browser calls the worker service directly (not through the API proxy) to list files, view content, see diffs, and download archives. The data flow is: `browser → worker (via assigned_worker_url) → filesystem`.
+The user can browse source code for tasks in any active state (pending, in_progress, completed, failed) directly in the web UI. For completed/failed tasks with a worker, the browser calls the worker service directly. For pending tasks with a `git_url`, the API proxies file requests via a temporary shallow clone. For in-progress tasks, the API proxies to the sandbox or worker. The data flow depends on task state and available sources.
 
 ## Domain Concepts
 
@@ -13,6 +13,18 @@ After a coding agent completes (or fails) a task, the user can browse the genera
 - Respects `.gitignore` patterns — ignored files are excluded from listing
 - Returns a tree structure with directories and files as nodes
 - Files include name, relative path, type (file/directory), and size
+
+### File Source Routing
+
+File browsing is available for all active task states. The source of files depends on the task's status and allocated resources:
+
+| Task Status | File Source | Condition |
+|-------------|-----------|-----------|
+| `pending` | Git repository (temp clone) | Task has `git_url` |
+| `in_progress` | Sandbox workspace (live) | Sandbox allocated |
+| `in_progress` | Worker workspace | Worker assigned, no sandbox |
+| `completed`/`failed` | Worker workspace | Current behavior |
+| `cleaning_up`/`cleaned` | Not available | |
 
 ### Binary Detection
 
@@ -32,6 +44,7 @@ Files are checked for binary content. Binary files:
 - Shows a list of changed files (via `git diff`)
 - Individual file diffs available with before/after content
 - Useful for reviewing what the agent actually changed vs. the cloned base
+- Diff tab is hidden for new projects (`task_type=scaffold_project` or no `git_url`) — diffs are meaningless without a base commit
 
 ### Zip Download
 
@@ -44,6 +57,8 @@ Files are checked for binary content. Binary files:
 All file operations validate that the resolved path stays within the working directory. Requests for paths that resolve outside (e.g., `../../etc/passwd`) are rejected with 403.
 
 ## API Contracts
+
+### Worker Endpoints (direct browser access)
 
 All endpoints are on the worker service (not the main API).
 
@@ -97,6 +112,22 @@ All endpoints are on the worker service (not the main API).
 
 Binary files return `is_binary: true` with no content. Files over 500 KB return `truncated: true` with partial content.
 
+### API File Proxy Endpoints (port 8000)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/tasks/{id}/files` | List files for any task (routes to appropriate source) |
+| GET | `/tasks/{id}/files/{path}` | Read file content for any task |
+
+Routing logic: `sandbox_url` -> sandbox, `worker_url` -> worker, `git_url` + pending -> temp clone.
+
+### Temp Clone Management
+
+- Shallow clone (`--depth 1`) to `/tmp/task-browse/{task_id}`
+- Cached per task — reused across requests for the same pending task
+- TTL: 1800 seconds (30 minutes)
+- Cleaned up on task status transition (e.g., pending -> in_progress)
+
 ## Service Architecture
 
 The source code browser has no dedicated service. It uses endpoints exposed by each worker service:
@@ -130,9 +161,29 @@ Each worker includes `CORSMiddleware` since the browser calls it directly (cross
 
 ## UI Components
 
-### SourceCodeSection (`web/src/components/tasks/SourceCodeSection.tsx`)
+### Tabbed Layout
 
-Container component rendered on the task detail page when status is `completed` or `failed`. Contains the file tree, file viewer, diff viewer, and download button.
+The task detail page uses a tabbed layout (Radix UI Tabs) with three tabs:
+
+- **Details** tab: task metadata, status, requirement, actions (Push, Clean Up)
+- **Files** tab: file navigator with filter + tree + viewer (uses API proxy endpoints)
+- **Diff** tab: diff viewer (uses worker endpoints directly)
+
+Tab visibility:
+- Files tab shown when: `git_url || assigned_worker_url || assigned_sandbox_url`
+- Diff tab shown when: `!isNewProject && (completed || failed)`
+
+Contextual banners:
+- For pending tasks: "Showing repository contents (read-only)"
+- For in_progress tasks: "Files may change as the agent works"
+
+### FileNavigatorTab
+
+Container component for the Files tab. Contains:
+- Filter input for case-insensitive path filtering
+- FileTree component
+- FileViewer component
+- Uses API proxy endpoints (`/tasks/{id}/files`) instead of direct worker calls
 
 ### FileTree (`web/src/components/tasks/FileTree.tsx`)
 
@@ -140,6 +191,7 @@ Container component rendered on the task detail page when status is `completed` 
 - Directories are expandable nodes, files are leaf nodes
 - Clicking a file loads its content in the FileViewer
 - On initial load: auto-selects README.md if present, otherwise the first file in the tree
+- Accepts `filter` prop for case-insensitive path filtering with ancestor directory preservation (matching files keep their parent directories visible)
 
 ### FileViewer (`web/src/components/tasks/FileViewer.tsx`)
 
@@ -148,24 +200,27 @@ Container component rendered on the task detail page when status is `completed` 
 - Shows truncation warning for large files
 - Language detection based on file extension
 
-### DiffViewer
+### DiffTab
 
-- Tab or view showing changed files and their diffs
+- Contains diff viewer showing changed files and their diffs
 - Individual file diffs with additions/deletions highlighted
+- Uses worker endpoints directly (not API proxy)
 
 ### Download Button
 
-- "Download Code" button within the Source Code section
+- "Download Code" button within the task detail area
 - Calls worker's `/download` endpoint directly
-- Moved here from the main task detail panel (no longer appears in task metadata area)
 
 ## Configuration
 
 - `CORS_ORIGINS`: Comma-separated allowed origins on each worker (dev: `http://localhost:3000`)
 - `NEXT_PUBLIC_WORKER_URL`: Fallback worker URL for the frontend (used when `assigned_worker_url` is not available on pre-010 tasks)
+- `TEMP_CLONE_DIR`: Directory for temporary clones (default: `/tmp/task-browse`)
+- `TEMP_CLONE_TTL_SECONDS`: TTL for cached temp clones (default: `1800`)
 
 ## Cross-Context Dependencies
 
-- **Task Lifecycle**: Source Code section renders only for `completed`/`failed` tasks; uses `assigned_worker_url` from task record
+- **Task Lifecycle**: File browsing available for `pending`, `in_progress`, `completed`, `failed` tasks; uses `assigned_worker_url`, `assigned_sandbox_url`, and `git_url` from task record
 - **Agent Execution**: File/diff/download endpoints are part of the shared worker API
-- **Git Integration**: Diff endpoints rely on git history in the working directory
+- **Git Integration**: Diff endpoints rely on git history in the working directory; temp clone uses git_url for pending tasks
+- **Platform Infrastructure**: API file proxy service routes requests to sandbox, worker, or temp clone based on task state

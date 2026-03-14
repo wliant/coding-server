@@ -1,5 +1,5 @@
 # Agent Execution
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Overview
 
@@ -41,6 +41,8 @@ The controller sends this payload to `POST /work`:
   "github_token": "string | null",
   "task_type": "build_feature",
   "commits_to_review": null,
+  "sandbox_url": "string | null",
+  "sandbox_capabilities": ["python", "git"],
   "llm_config": {
     "provider": "ollama",
     "model": "qwen2.5-coder:7b",
@@ -58,7 +60,7 @@ The controller sends this payload to `POST /work`:
 2. Persist execution start to `worker_executions` table (upsert for retries)
 3. Clone repository if `git_url` is provided (with GitHub token injection)
 4. Check out specified branch (or create from default if doesn't exist remotely)
-5. Execute the agent library with LLM config from settings
+5. Execute the agent library with LLM config from settings (agent may receive `sandbox_url` and `sandbox_capabilities` for MCP-based execution)
 6. Update execution status to completed/failed
 7. Report status via heartbeat to controller
 

@@ -1,5 +1,5 @@
 # Task Lifecycle
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Overview
 
@@ -55,6 +55,9 @@ Everything about how a coding task moves through the system: submission, executi
 | assigned_worker_url | TEXT | nullable | Worker URL for direct file browsing |
 | lease_holder | VARCHAR(36) | nullable | Worker UUID holding the lease |
 | lease_expires_at | TIMESTAMPTZ | nullable | Lease TTL expiry timestamp |
+| required_capabilities | TEXT[] | nullable | Capability strings required for this task |
+| assigned_sandbox_id | VARCHAR(255) | nullable | Sandbox allocated by controller |
+| assigned_sandbox_url | TEXT | nullable | Sandbox URL for file/MCP access |
 | error_message | TEXT | nullable | Human-readable error for failed jobs |
 | created_at | TIMESTAMPTZ | NOT NULL, default now() | |
 | started_at | TIMESTAMPTZ | nullable | When worker began execution |
@@ -94,7 +97,8 @@ Everything about how a coding task moves through the system: submission, executi
   "branch": "string (optional, required for review_code)",
   "commits_to_review": 5,
   "agent_id": "uuid (required)",
-  "requirement": "string (required)"
+  "requirement": "string (required)",
+  "required_capabilities": ["python", "docker"]
 }
 ```
 
@@ -114,7 +118,7 @@ Everything about how a coding task moves through the system: submission, executi
 
 ### GET /tasks/{id} — TaskDetailResponse
 
-Extends TaskResponse with: `git_url`, `branch`, `task_type`, `commits_to_review`, `work_directory_path`, `started_at`, `completed_at`, `error_message`, `assigned_worker_id`, `assigned_worker_url`.
+Extends TaskResponse with: `git_url`, `branch`, `task_type`, `commits_to_review`, `work_directory_path`, `started_at`, `completed_at`, `error_message`, `assigned_worker_id`, `assigned_worker_url`, `required_capabilities`, `assigned_sandbox_id`, `assigned_sandbox_url`.
 
 ### PATCH /tasks/{id}
 
@@ -148,6 +152,7 @@ User → Web UI → API (POST /tasks) → PostgreSQL
 - Branch field (optional, required for review_code)
 - Commits to Review (optional, review_code only)
 - Agent selector (populated from `GET /agents`)
+- Required Capabilities: comma-separated input field (optional, shown for all task types)
 - Requirements textarea
 
 ### TaskTable (`web/src/app/tasks/`)
@@ -166,6 +171,9 @@ Color-coded badges for all 7 statuses: pending (blue), in_progress (purple), com
 - In Progress: elapsed time counter
 - Completed/Failed: Push to Remote button, Clean Up button, Source Code section
 - Failed: error message display
+- Shows capability badges when `required_capabilities` are set
+- Shows sandbox ID when a sandbox is allocated
+- Files tab available for pending/in_progress tasks (not just completed/failed) — see Source Code Browser context
 
 ## Configuration
 
