@@ -971,6 +971,48 @@
             "title": "Commits To Review",
             "description": "Number of recent commits to review (only for review_code tasks)",
             "default": null
+          },
+          "required_capabilities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Capabilities",
+            "description": "List of sandbox capabilities required for this task",
+            "default": null
+          },
+          "assigned_sandbox_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Sandbox Id",
+            "description": "ID of the sandbox allocated for this task",
+            "default": null
+          },
+          "assigned_sandbox_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Sandbox Url",
+            "description": "URL of the sandbox allocated for this task",
+            "default": null
           }
         },
         "type": "object",

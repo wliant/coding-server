@@ -18,6 +18,9 @@ async def test_handle_cleaning_up_calls_worker_free_endpoint():
     job = MagicMock(spec=Job)
     job.id = uuid.uuid4()
     job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
 
     db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
@@ -47,6 +50,9 @@ async def test_handle_cleaning_up_sets_job_to_cleaned_after_success():
     job = MagicMock(spec=Job)
     job.id = uuid.uuid4()
     job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
 
     db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
@@ -85,6 +91,9 @@ async def test_handle_cleaning_up_leaves_task_on_worker_error():
     job = MagicMock(spec=Job)
     job.id = uuid.uuid4()
     job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
 
     db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()

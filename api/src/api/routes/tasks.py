@@ -23,6 +23,7 @@ from api.schemas.task import (
     UpdateTaskRequest,
 )
 from api.services import task_service
+from api.services import file_proxy_service
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -79,6 +80,9 @@ def _task_to_detail_response(
         assigned_worker_url=job.assigned_worker_url,
         task_type=job.task_type,
         commits_to_review=job.commits_to_review,
+        required_capabilities=job.required_capabilities,
+        assigned_sandbox_id=job.assigned_sandbox_id,
+        assigned_sandbox_url=job.assigned_sandbox_url,
     )
 
 
@@ -130,6 +134,18 @@ async def download_task(
 async def cleanup_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     job = await task_service.initiate_cleanup(db, task_id)
     return CleanupResponse(task_id=job.id, status=TaskStatus(job.status))
+
+
+@router.get("/{task_id}/files")
+async def list_task_files(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    return await file_proxy_service.list_task_files(db, task_id)
+
+
+@router.get("/{task_id}/files/{file_path:path}")
+async def get_task_file_content(
+    task_id: uuid.UUID, file_path: str, db: AsyncSession = Depends(get_db)
+):
+    return await file_proxy_service.get_task_file_content(db, task_id, file_path)
 
 
 @router.patch("/{task_id}", response_model=TaskResponse)

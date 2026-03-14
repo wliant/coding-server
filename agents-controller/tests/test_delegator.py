@@ -355,6 +355,9 @@ async def test_handle_cleaning_up_calls_worker_free():
     job = MagicMock(spec=Job)
     job.id = uuid.uuid4()
     job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
 
     db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
@@ -384,6 +387,9 @@ async def test_handle_cleaning_up_leaves_task_on_worker_error():
     job = MagicMock(spec=Job)
     job.id = uuid.uuid4()
     job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
 
     db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
@@ -401,3 +407,164 @@ async def test_handle_cleaning_up_leaves_task_on_worker_error():
 
     # Should still commit (for idempotency) but only executed 1 time (select, no update)
     assert db.execute.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Sandbox-related delegation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delegate_with_sandbox_allocation():
+    """When a task has required_capabilities, a matching sandbox is allocated."""
+    from controller.sandbox_registry import SandboxRegistry
+
+    registry = WorkerRegistry()
+    await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
+
+    sandbox_registry = SandboxRegistry()
+    await sandbox_registry.register("sb-1", "http://sandbox1:8006", ["python", "git"])
+
+    job, project, agent = _make_job(status="pending")
+    job.required_capabilities = ["python"]
+    job.task_type = "build_feature"
+    job.commits_to_review = None
+    job.assigned_sandbox_id = None
+    job.assigned_sandbox_url = None
+
+    db = AsyncMock(spec=AsyncSession)
+    mock_result_jobs = MagicMock()
+    mock_result_jobs.all.return_value = [(job, project, agent)]
+    mock_claimed = MagicMock()
+    mock_claimed.fetchone.return_value = (job.id,)
+    db.execute = AsyncMock(side_effect=[mock_result_jobs, mock_claimed])
+    db.commit = AsyncMock()
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("controller.delegator._fetch_llm_config", new_callable=AsyncMock) as mock_llm, \
+         patch("httpx.AsyncClient") as mock_client_cls:
+        mock_llm.return_value = {"provider": "ollama", "model": "test", "temperature": 0.2}
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await _delegate_pending_tasks(registry, db, lease_ttl_seconds=300, sandbox_registry=sandbox_registry)
+
+    # Verify sandbox was allocated
+    all_sb = await sandbox_registry.get_all()
+    assert all_sb[0].status == "allocated"
+    assert all_sb[0].current_task_id == str(job.id)
+
+    # Verify work payload includes sandbox fields
+    call_args = mock_client_instance.post.call_args
+    payload = call_args[1]["json"]
+    assert payload["sandbox_url"] == "http://sandbox1:8006"
+    assert payload["sandbox_capabilities"] == ["python", "git"]
+
+
+@pytest.mark.asyncio
+async def test_delegate_skips_task_when_no_matching_sandbox():
+    """When required_capabilities don't match any sandbox, task is skipped."""
+    from controller.sandbox_registry import SandboxRegistry
+
+    registry = WorkerRegistry()
+    await registry.register("worker-1", "simple_crewai_pair_agent", "http://worker1:8001")
+
+    sandbox_registry = SandboxRegistry()
+    await sandbox_registry.register("sb-1", "http://sandbox1:8006", ["python"])
+
+    job, project, agent = _make_job(status="pending")
+    job.required_capabilities = ["docker"]  # No sandbox has docker
+    job.task_type = "build_feature"
+    job.commits_to_review = None
+
+    db = AsyncMock(spec=AsyncSession)
+    mock_result_jobs = MagicMock()
+    mock_result_jobs.all.return_value = [(job, project, agent)]
+    db.execute = AsyncMock(return_value=mock_result_jobs)
+    db.commit = AsyncMock()
+
+    with patch("controller.delegator._fetch_llm_config", new_callable=AsyncMock) as mock_llm, \
+         patch("httpx.AsyncClient") as mock_client_cls:
+        mock_llm.return_value = {}
+        mock_client_instance = AsyncMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await _delegate_pending_tasks(registry, db, lease_ttl_seconds=300, sandbox_registry=sandbox_registry)
+
+    # No HTTP call — task was skipped
+    mock_client_instance.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_cleaning_up_resets_sandbox():
+    """When cleaning up a task with sandbox, sandbox is reset and freed."""
+    from controller.sandbox_registry import SandboxRegistry
+
+    registry = WorkerRegistry()
+    sandbox_registry = SandboxRegistry()
+    await sandbox_registry.register("sb-1", "http://sandbox1:8006", ["python"])
+    await sandbox_registry.allocate("sb-1", "some-task")
+
+    job = MagicMock(spec=Job)
+    job.id = uuid.uuid4()
+    job.assigned_worker_url = "http://worker1:8001"
+    job.assigned_worker_id = "worker-1"
+    job.assigned_sandbox_id = "sb-1"
+    job.assigned_sandbox_url = "http://sandbox1:8006"
+
+    db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = [job]
+    db.execute = AsyncMock(side_effect=[mock_result, MagicMock()])
+    db.commit = AsyncMock()
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await _handle_cleaning_up_tasks(registry, db, sandbox_registry=sandbox_registry)
+
+    # Verify /free and /reset were both called
+    calls = [str(c) for c in mock_client_instance.post.call_args_list]
+    assert any("/free" in c for c in calls)
+    assert any("/reset" in c for c in calls)
+
+    # Verify sandbox was freed
+    all_sb = await sandbox_registry.get_all()
+    assert all_sb[0].status == "free"
+
+
+@pytest.mark.asyncio
+async def test_reap_unreachable_sandboxes():
+    """Stale sandboxes are marked as unreachable."""
+    from datetime import timedelta
+
+    from controller.sandbox_registry import SandboxRegistry
+
+    sandbox_registry = SandboxRegistry()
+    await sandbox_registry.register("sb-1", "http://sandbox1:8006", ["python"])
+    sandbox_registry._sandboxes["sb-1"].last_heartbeat_at = (
+        datetime.now(timezone.utc) - timedelta(seconds=120)
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+
+    from controller.delegator import _reap_unreachable_sandboxes
+    await _reap_unreachable_sandboxes(sandbox_registry, db, timeout_seconds=60)
+
+    all_sb = await sandbox_registry.get_all()
+    assert all_sb[0].status == "unreachable"
+    db.execute.assert_called_once()
+    db.commit.assert_called_once()

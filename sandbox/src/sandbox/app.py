@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 
 from sandbox.config import settings
+from sandbox.mcp_server import create_mcp_server
 from sandbox.registration import register_with_controller, start_heartbeat_loop
 from sandbox.routes import make_router
 
@@ -89,8 +90,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    router = make_router(workspace_dir=settings.WORKSPACE_DIR)
+    router = make_router(workspace_dir=settings.WORKSPACE_DIR, labels=settings.labels_list)
     app.include_router(router)
+
+    # Mount MCP SSE endpoint
+    mcp = create_mcp_server(
+        workspace_dir=settings.WORKSPACE_DIR,
+        labels=settings.labels_list,
+    )
+    app.mount("/mcp", mcp.http_app())
+
     return app
 
 

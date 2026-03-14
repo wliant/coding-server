@@ -189,3 +189,34 @@ def test_write_and_execute_script(http: httpx.Client):
     assert body["exit_code"] == 0
     assert "foo" in body["stdout"]
     assert "bar" in body["stdout"]
+
+
+# ---- Capabilities endpoint ----
+
+def test_sandbox_capabilities(http: httpx.Client):
+    """GET /capabilities returns the sandbox's labels."""
+    r = http.get(f"{SANDBOX_URL}/capabilities")
+    assert r.status_code == 200
+    body = r.json()
+    assert "capabilities" in body
+    assert isinstance(body["capabilities"], list)
+    assert "python" in body["capabilities"]
+
+
+# ---- Reset endpoint ----
+
+def test_sandbox_reset(http: httpx.Client):
+    """POST /reset clears workspace, then files are gone."""
+    # Write a file first
+    http.put(f"{SANDBOX_URL}/files/reset_test.txt", json={"content": "before reset"})
+    r = http.get(f"{SANDBOX_URL}/files/reset_test.txt")
+    assert r.status_code == 200
+
+    # Reset
+    r = http.post(f"{SANDBOX_URL}/reset")
+    assert r.status_code == 200
+    assert r.json()["reset"] is True
+
+    # File should be gone
+    r = http.get(f"{SANDBOX_URL}/files/reset_test.txt")
+    assert r.status_code == 404

@@ -67,6 +67,8 @@ class WorkRequest(BaseModel):
     llm_config: LLMConfig
     task_type: str = "build_feature"
     commits_to_review: int | None = None
+    sandbox_url: str | None = None
+    sandbox_capabilities: list[str] | None = None
 
 
 class WorkAcceptedResponse(BaseModel):
@@ -614,6 +616,8 @@ async def _execute_work(req: WorkRequest, work_dir: Path, db_session_factory) ->
         work_dir=str(work_dir),
         task_type=req.task_type,
         commits_to_review=req.commits_to_review,
+        sandbox_url=req.sandbox_url,
+        sandbox_capabilities=req.sandbox_capabilities,
     )
 
     success, error_msg = await run_coding_agent(agent_req, db_session_factory)

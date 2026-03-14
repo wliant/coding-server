@@ -78,6 +78,9 @@ class TaskDetailResponse(BaseModel):
     assigned_worker_url: str | None = None
     task_type: str
     commits_to_review: int | None = None
+    required_capabilities: list[str] | None = None
+    assigned_sandbox_id: str | None = None
+    assigned_sandbox_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -115,6 +118,7 @@ class CreateTaskRequest(BaseModel):
     branch: str | None = None
     requirements: str = Field(..., min_length=1)
     commits_to_review: int | None = None
+    required_capabilities: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> "CreateTaskRequest":

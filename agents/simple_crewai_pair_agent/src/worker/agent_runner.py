@@ -37,6 +37,8 @@ class WorkRequest:
     llm_config: dict | None = None
     task_type: str = "build_feature"
     commits_to_review: int | None = None
+    sandbox_url: str | None = None
+    sandbox_capabilities: list[str] | None = None
 
 
 def _resolve_agent_classes():

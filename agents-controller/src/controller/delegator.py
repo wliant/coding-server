@@ -81,7 +81,9 @@ async def _renew_active_leases(
 
 
 async def _handle_cleaning_up_tasks(
-    registry: WorkerRegistry, db: AsyncSession
+    registry: WorkerRegistry,
+    db: AsyncSession,
+    sandbox_registry: SandboxRegistry | None = None,
 ) -> None:
     """Call /free on worker for tasks in cleaning_up state."""
     result = await db.execute(
@@ -94,6 +96,7 @@ async def _handle_cleaning_up_tasks(
 
     for job in cleaning_jobs:
         worker_id_to_free = job.assigned_worker_id
+        sandbox_id_to_free = getattr(job, "assigned_sandbox_id", None)
         now = datetime.now(timezone.utc)
         worker_gone = False
 
@@ -102,7 +105,6 @@ async def _handle_cleaning_up_tasks(
                 resp = await client.post(f"{job.assigned_worker_url}/free")
                 resp.raise_for_status()
         except httpx.ConnectError:
-            # Worker container is gone (restarted/replaced) — treat as already freed
             worker_gone = True
             logger.warning(
                 "cleanup_worker_unreachable",
@@ -119,7 +121,20 @@ async def _handle_cleaning_up_tasks(
             )
             continue
 
-        # Mark job as cleaned (whether worker responded or was already gone)
+        # Reset sandbox workspace if allocated
+        sandbox_url = getattr(job, "assigned_sandbox_url", None)
+        if sandbox_url:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(f"{sandbox_url}/reset")
+                    resp.raise_for_status()
+            except Exception as exc:
+                logger.warning(
+                    "sandbox_reset_failed",
+                    extra={"event": "sandbox_reset_failed", "task_id": str(job.id), "error": str(exc)},
+                )
+
+        # Mark job as cleaned
         await db.execute(
             update(Job)
             .where(Job.id == job.id)
@@ -127,11 +142,15 @@ async def _handle_cleaning_up_tasks(
                 status="cleaned",
                 assigned_worker_id=None,
                 assigned_worker_url=None,
+                assigned_sandbox_id=None,
+                assigned_sandbox_url=None,
                 updated_at=now,
             )
         )
         if worker_id_to_free and not worker_gone:
             await registry.set_free(worker_id_to_free)
+        if sandbox_id_to_free and sandbox_registry:
+            await sandbox_registry.free_sandbox(sandbox_id_to_free)
         logger.info(
             "cleanup_succeeded",
             extra={"event": "cleanup_succeeded", "task_id": str(job.id), "worker_gone": worker_gone},
@@ -142,7 +161,10 @@ async def _handle_cleaning_up_tasks(
 
 
 async def _delegate_pending_tasks(
-    registry: WorkerRegistry, db: AsyncSession, lease_ttl_seconds: int
+    registry: WorkerRegistry,
+    db: AsyncSession,
+    lease_ttl_seconds: int,
+    sandbox_registry: SandboxRegistry | None = None,
 ) -> None:
     """Find pending tasks and delegate to free matching workers."""
     # Fetch pending jobs joined with agent for agent type
@@ -165,21 +187,35 @@ async def _delegate_pending_tasks(
         if worker is None:
             continue
 
+        # If capabilities are required, allocate a matching sandbox
+        sandbox = None
+        required_caps = getattr(job, "required_capabilities", None)
+        if required_caps and sandbox_registry:
+            sandbox = await sandbox_registry.get_free_sandbox_for_capabilities(required_caps)
+            if sandbox is None:
+                # No matching sandbox available — skip this task for now
+                continue
+
         # Atomically claim the task
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(seconds=lease_ttl_seconds)
+        claim_values = {
+            "status": "in_progress",
+            "lease_holder": worker.worker_id,
+            "lease_expires_at": expires_at,
+            "assigned_worker_id": worker.worker_id,
+            "assigned_worker_url": worker.worker_url,
+            "started_at": now,
+            "updated_at": now,
+        }
+        if sandbox:
+            claim_values["assigned_sandbox_id"] = sandbox.sandbox_id
+            claim_values["assigned_sandbox_url"] = sandbox.sandbox_url
+
         result2 = await db.execute(
             update(Job)
             .where(Job.id == job.id, Job.status == "pending")
-            .values(
-                status="in_progress",
-                lease_holder=worker.worker_id,
-                lease_expires_at=expires_at,
-                assigned_worker_id=worker.worker_id,
-                assigned_worker_url=worker.worker_url,
-                started_at=now,
-                updated_at=now,
-            )
+            .values(**claim_values)
             .returning(Job.id)
         )
         claimed = result2.fetchone()
@@ -188,6 +224,10 @@ async def _delegate_pending_tasks(
             continue
 
         await db.commit()
+
+        # Allocate sandbox in registry
+        if sandbox and sandbox_registry:
+            await sandbox_registry.allocate(sandbox.sandbox_id, str(job.id))
 
         # Fetch LLM config from main API
         llm_config = await _fetch_llm_config()
@@ -205,6 +245,9 @@ async def _delegate_pending_tasks(
             "task_type": job.task_type,
             "commits_to_review": job.commits_to_review,
         }
+        if sandbox:
+            work_payload["sandbox_url"] = sandbox.sandbox_url
+            work_payload["sandbox_capabilities"] = sandbox.labels
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -219,6 +262,7 @@ async def _delegate_pending_tasks(
                     "task_id": str(job.id),
                     "worker_id": worker.worker_id,
                     "agent_type": agent_type,
+                    "sandbox_id": sandbox.sandbox_id if sandbox else None,
                 },
             )
         except Exception as exc:
@@ -232,19 +276,25 @@ async def _delegate_pending_tasks(
                     "error": str(exc),
                 },
             )
+            rollback_values = {
+                "status": "pending",
+                "lease_holder": None,
+                "lease_expires_at": None,
+                "assigned_worker_id": None,
+                "assigned_worker_url": None,
+                "assigned_sandbox_id": None,
+                "assigned_sandbox_url": None,
+                "updated_at": datetime.now(timezone.utc),
+            }
             await db.execute(
                 update(Job)
                 .where(Job.id == job.id)
-                .values(
-                    status="pending",
-                    lease_holder=None,
-                    lease_expires_at=None,
-                    assigned_worker_id=None,
-                    assigned_worker_url=None,
-                    updated_at=datetime.now(timezone.utc),
-                )
+                .values(**rollback_values)
             )
             await db.commit()
+            # Free the sandbox on failure
+            if sandbox and sandbox_registry:
+                await sandbox_registry.free_sandbox(sandbox.sandbox_id)
 
 
 async def _fetch_llm_config() -> dict:
@@ -365,8 +415,8 @@ async def run_poll_cycle(
     async with session_factory() as db:
         await _reap_unreachable_workers(registry, db, cfg.HEARTBEAT_TIMEOUT_SECONDS)
         await _renew_active_leases(registry, db, cfg.LEASE_TTL_SECONDS)
-        await _handle_cleaning_up_tasks(registry, db)
-        await _delegate_pending_tasks(registry, db, cfg.LEASE_TTL_SECONDS)
+        await _handle_cleaning_up_tasks(registry, db, sandbox_registry)
+        await _delegate_pending_tasks(registry, db, cfg.LEASE_TTL_SECONDS, sandbox_registry)
         if sandbox_registry is not None:
             await _reap_unreachable_sandboxes(
                 sandbox_registry, db, cfg.SANDBOX_HEARTBEAT_TIMEOUT_SECONDS

@@ -37,6 +37,9 @@ class Job(Base):
     assigned_worker_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     task_type: Mapped[str] = mapped_column(String(30), nullable=False, default="build_feature")
     commits_to_review: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    required_capabilities: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    assigned_sandbox_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assigned_sandbox_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Project(Base):

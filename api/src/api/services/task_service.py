@@ -43,6 +43,7 @@ async def create_task(
         branch=req.branch,
         task_type=req.task_type.value,
         commits_to_review=req.commits_to_review,
+        required_capabilities=req.required_capabilities,
         status="pending",
         updated_at=now,
     )

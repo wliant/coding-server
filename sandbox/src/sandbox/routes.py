@@ -57,9 +57,10 @@ def _is_binary(path: Path) -> bool:
         return False
 
 
-def make_router(workspace_dir: str) -> APIRouter:
+def make_router(workspace_dir: str, labels: list[str] | None = None) -> APIRouter:
     r = APIRouter()
     ws_root = Path(workspace_dir)
+    _labels = labels or []
 
     def _resolve_path(path: str) -> Path:
         """Resolve and validate path is within workspace."""
@@ -186,5 +187,22 @@ def make_router(workspace_dir: str) -> APIRouter:
                 "Connection": "keep-alive",
             },
         )
+
+    @r.get("/capabilities")
+    async def get_capabilities():
+        return {"capabilities": _labels}
+
+    @r.post("/reset")
+    async def reset_workspace():
+        """Clear workspace directory contents (preserving the directory itself)."""
+        import shutil
+
+        if ws_root.exists():
+            for item in ws_root.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+        return {"reset": True}
 
     return r

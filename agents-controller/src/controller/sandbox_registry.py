@@ -18,6 +18,7 @@ class SandboxRecord:
     status: SandboxStatus
     last_heartbeat_at: datetime
     registered_at: datetime
+    current_task_id: str | None = None
 
 
 class SandboxRegistry:
@@ -72,3 +73,32 @@ class SandboxRegistry:
                 if rec.status not in ("unreachable",)
                 and (now - rec.last_heartbeat_at).total_seconds() > timeout_seconds
             ]
+
+    async def get_free_sandbox_for_capabilities(
+        self, required: list[str] | None
+    ) -> SandboxRecord | None:
+        """Find a free sandbox whose labels contain all required capabilities."""
+        required_set = set(required) if required else set()
+        async with self._lock:
+            for rec in self._sandboxes.values():
+                if rec.status != "free":
+                    continue
+                if required_set.issubset(set(rec.labels)):
+                    return rec
+            return None
+
+    async def allocate(self, sandbox_id: str, task_id: str) -> None:
+        """Mark a sandbox as allocated for a task."""
+        async with self._lock:
+            rec = self._sandboxes.get(sandbox_id)
+            if rec:
+                rec.status = "allocated"
+                rec.current_task_id = task_id
+
+    async def free_sandbox(self, sandbox_id: str) -> None:
+        """Return a sandbox to the free pool."""
+        async with self._lock:
+            rec = self._sandboxes.get(sandbox_id)
+            if rec:
+                rec.status = "free"
+                rec.current_task_id = None
