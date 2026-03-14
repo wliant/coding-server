@@ -47,9 +47,9 @@ async def test_run_coding_agent_calls_clone_when_git_url_set():
 
         await agent_runner.run_coding_agent(req, db_session_factory=None)
 
-    # asyncio.to_thread should have been called for clone
-    mock_to_thread.assert_called_once()
-    call_args = mock_to_thread.call_args
+    # asyncio.to_thread should have been called for clone (first call)
+    assert mock_to_thread.call_count >= 1
+    call_args = mock_to_thread.call_args_list[0]
     assert call_args.args[0] is agent_runner.clone_repository
 
 

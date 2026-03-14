@@ -8,7 +8,7 @@ from api.models.job import Job
 from api.models.project import Project
 from api.schemas.task import (
     CreateTaskRequest,
-    ProjectType,
+    TaskType,
     TaskStatus,
     UpdateTaskRequest,
 )
@@ -17,10 +17,10 @@ from api.services import task_service
 _AGENT_ID = uuid.uuid4()
 
 
-async def test_create_task_new_project_creates_both_project_and_job(db_session):
-    """create_task with project_type='new' should create a Project and a Job row."""
+async def test_create_task_scaffold_project_creates_both_project_and_job(db_session):
+    """create_task with task_type='scaffold_project' should create a Project and a Job row."""
     req = CreateTaskRequest(
-        project_type=ProjectType.new,
+        task_type=TaskType.scaffold_project,
         project_name="Test Project",
         agent_id=_AGENT_ID,
         requirements="Build a REST API",
@@ -33,15 +33,16 @@ async def test_create_task_new_project_creates_both_project_and_job(db_session):
     assert job.project_id == project.id
     assert job.requirement == "Build a REST API"
     assert job.status == "pending"
+    assert job.task_type == "scaffold_project"
     assert project.name == "Test Project"
     assert project.source_type == "new"
     assert agent is None  # agent not seeded in DB
 
 
-async def test_create_task_existing_project_creates_new_project_and_job(db_session):
-    """create_task with project_type='existing' and git_url creates a new Project and Job."""
+async def test_create_task_build_feature_creates_project_and_job(db_session):
+    """create_task with task_type='build_feature' and git_url creates a new Project and Job."""
     req = CreateTaskRequest(
-        project_type=ProjectType.existing,
+        task_type=TaskType.build_feature,
         agent_id=_AGENT_ID,
         git_url="https://github.com/org/existing-repo.git",
         requirements="Add feature X",
@@ -55,15 +56,16 @@ async def test_create_task_existing_project_creates_new_project_and_job(db_sessi
     assert project.source_type == "existing"
     assert project.git_url == "https://github.com/org/existing-repo.git"
     assert job.status == "pending"
+    assert job.task_type == "build_feature"
 
 
-def test_create_task_existing_project_missing_git_url_raises_validation_error():
-    """CreateTaskRequest with project_type='existing' and no git_url raises ValidationError."""
+def test_create_task_build_feature_missing_git_url_raises_validation_error():
+    """CreateTaskRequest with task_type='build_feature' and no git_url raises ValidationError."""
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError) as exc_info:
         CreateTaskRequest(
-            project_type=ProjectType.existing,
+            task_type=TaskType.build_feature,
             agent_id=_AGENT_ID,
             requirements="Do something",
         )
@@ -72,7 +74,7 @@ def test_create_task_existing_project_missing_git_url_raises_validation_error():
 
 
 async def test_abort_task_on_pending_succeeds(db_session):
-    """abort_task on a pending job → status becomes 'aborted'."""
+    """abort_task on a pending job -> status becomes 'aborted'."""
     project = Project(name=None, source_type="new", status="active")
     db_session.add(project)
     await db_session.flush()
@@ -81,7 +83,6 @@ async def test_abort_task_on_pending_succeeds(db_session):
         project_id=project.id,
         requirement="Some task",
         status="pending",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -102,7 +103,6 @@ async def test_abort_task_on_in_progress_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="in_progress",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -124,7 +124,6 @@ async def test_abort_task_on_aborted_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="aborted",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -137,7 +136,7 @@ async def test_abort_task_on_aborted_raises_422(db_session):
 
 
 async def test_resubmit_task_on_aborted_returns_to_pending(db_session):
-    """resubmit_task on aborted job → status='pending', fields updated."""
+    """resubmit_task on aborted job -> status='pending', fields updated."""
     project = Project(name=None, source_type="new", status="active")
     db_session.add(project)
     await db_session.flush()
@@ -146,7 +145,6 @@ async def test_resubmit_task_on_aborted_returns_to_pending(db_session):
         project_id=project.id,
         requirement="Old requirement",
         status="aborted",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -175,7 +173,6 @@ async def test_resubmit_task_on_pending_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="pending",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -189,10 +186,10 @@ async def test_resubmit_task_on_pending_raises_422(db_session):
     assert exc_info.value.status_code == 422
 
 
-async def test_create_task_new_project_with_git_url_stores_git_url(db_session):
-    """create_task with project_type='new' and git_url stores it on the project."""
+async def test_create_task_scaffold_with_git_url_stores_git_url(db_session):
+    """create_task with task_type='scaffold_project' and git_url stores it on the project."""
     req = CreateTaskRequest(
-        project_type=ProjectType.new,
+        task_type=TaskType.scaffold_project,
         project_name="Repo Project",
         agent_id=_AGENT_ID,
         requirements="Build a REST API",
@@ -204,10 +201,10 @@ async def test_create_task_new_project_with_git_url_stores_git_url(db_session):
     assert project.git_url == "https://github.com/org/repo.git"
 
 
-async def test_create_task_new_project_without_git_url_leaves_git_url_null(db_session):
-    """create_task with project_type='new' and no git_url leaves git_url as None."""
+async def test_create_task_scaffold_without_git_url_leaves_git_url_null(db_session):
+    """create_task with task_type='scaffold_project' and no git_url leaves git_url as None."""
     req = CreateTaskRequest(
-        project_type=ProjectType.new,
+        task_type=TaskType.scaffold_project,
         project_name="No Git Project",
         agent_id=_AGENT_ID,
         requirements="Build a REST API",
@@ -230,7 +227,6 @@ async def test_get_task_detail_returns_job_project_and_no_work_directory(db_sess
         project_id=project.id,
         requirement="Some task",
         status="pending",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -259,7 +255,6 @@ async def test_get_task_detail_returns_work_directory_when_present(db_session):
         project_id=project.id,
         requirement="Some task",
         status="in_progress",
-
     )
     db_session.add(job)
     await db_session.flush()
@@ -295,7 +290,6 @@ async def test_resubmit_task_on_completed_raises_422(db_session):
         project_id=project.id,
         requirement="Some task",
         status="completed",
-
     )
     db_session.add(job)
     await db_session.commit()
@@ -331,10 +325,8 @@ def test_inject_github_token_leaves_ssh_unchanged():
 
 async def test_create_task_stores_branch(db_session):
     """create_task persists branch field on the job."""
-    from api.schemas.task import CreateTaskRequest, ProjectType
-
     req = CreateTaskRequest(
-        project_type=ProjectType.existing,
+        task_type=TaskType.build_feature,
         agent_id=_AGENT_ID,
         git_url="https://github.com/org/repo.git",
         branch="feature/my-feature",
@@ -348,10 +340,8 @@ async def test_create_task_stores_branch(db_session):
 
 async def test_create_task_branch_defaults_to_none(db_session):
     """create_task with no branch leaves job.branch as None."""
-    from api.schemas.task import CreateTaskRequest, ProjectType
-
     req = CreateTaskRequest(
-        project_type=ProjectType.new,
+        task_type=TaskType.scaffold_project,
         project_name="No Branch Project",
         agent_id=_AGENT_ID,
         requirements="Build something",
@@ -366,7 +356,7 @@ async def test_create_task_branch_defaults_to_none(db_session):
 
 
 async def test_initiate_cleanup_on_completed_sets_cleaning_up(db_session):
-    """initiate_cleanup on completed job → status becomes 'cleaning_up'."""
+    """initiate_cleanup on completed job -> status becomes 'cleaning_up'."""
     project = Project(name=None, source_type="new", status="active")
     db_session.add(project)
     await db_session.flush()
@@ -382,7 +372,7 @@ async def test_initiate_cleanup_on_completed_sets_cleaning_up(db_session):
 
 
 async def test_initiate_cleanup_on_failed_sets_cleaning_up(db_session):
-    """initiate_cleanup on failed job → status becomes 'cleaning_up'."""
+    """initiate_cleanup on failed job -> status becomes 'cleaning_up'."""
     project = Project(name=None, source_type="new", status="active")
     db_session.add(project)
     await db_session.flush()

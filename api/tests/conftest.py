@@ -20,8 +20,10 @@ async def db_session():
     from api.models.agent import Agent  # noqa: F401
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    # Exclude sandboxes table — ARRAY(Text) is not supported by SQLite
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "sandboxes"]
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session

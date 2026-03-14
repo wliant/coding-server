@@ -14,8 +14,9 @@ from api.models.agent import Agent  # noqa: F401
 @pytest.fixture
 async def test_engine():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "sandboxes"]
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     yield engine
     await engine.dispose()
 
@@ -64,7 +65,7 @@ async def seeded_agent(test_session) -> Agent:
 async def test_create_task_existing_project_with_git_url(client, test_session, seeded_agent):
     """POST /tasks with project_type='existing' and git_url returns 201 with a new project."""
     payload = {
-        "project_type": "existing",
+        "task_type": "build_feature",
         "agent_id": str(seeded_agent.id),
         "git_url": "https://github.com/org/original.git",
         "requirements": "Add authentication",
@@ -80,7 +81,7 @@ async def test_create_task_existing_project_with_git_url(client, test_session, s
 async def test_create_task_existing_project_missing_git_url(client, test_session, seeded_agent):
     """POST /tasks with project_type='existing' but no git_url returns 422."""
     payload = {
-        "project_type": "existing",
+        "task_type": "build_feature",
         "agent_id": str(seeded_agent.id),
         "requirements": "Do something",
         # git_url intentionally omitted

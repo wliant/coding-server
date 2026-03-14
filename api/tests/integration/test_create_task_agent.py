@@ -15,8 +15,9 @@ from api.models.agent import Agent  # noqa: F401
 @pytest.fixture
 async def test_engine():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "sandboxes"]
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, tables=tables)
     yield engine
     await engine.dispose()
 
@@ -62,7 +63,7 @@ async def seeded_agent(test_session) -> Agent:
 async def test_create_task_new_project_with_agent_returns_201(client, test_session, seeded_agent):
     """POST /tasks with project_type='new', project_name, and agent_id returns 201."""
     payload = {
-        "project_type": "new",
+        "task_type": "scaffold_project",
         "project_name": "Acme App",
         "agent_id": str(seeded_agent.id),
         "requirements": "Build a REST API",
@@ -81,7 +82,7 @@ async def test_create_task_new_project_with_agent_returns_201(client, test_sessi
 async def test_create_task_new_project_missing_project_name_returns_422(client, test_session, seeded_agent):
     """POST /tasks with project_type='new' but no project_name returns 422."""
     payload = {
-        "project_type": "new",
+        "task_type": "scaffold_project",
         "agent_id": str(seeded_agent.id),
         "requirements": "Build something",
     }
@@ -95,7 +96,7 @@ async def test_create_task_new_project_missing_project_name_returns_422(client, 
 async def test_create_task_missing_agent_id_returns_422(client, test_session):
     """POST /tasks without agent_id returns 422."""
     payload = {
-        "project_type": "new",
+        "task_type": "scaffold_project",
         "project_name": "Test",
         "requirements": "Do something",
     }
@@ -108,7 +109,7 @@ async def test_create_task_missing_agent_id_returns_422(client, test_session):
 async def test_create_task_new_project_with_git_url_saves_url(client, test_session, seeded_agent):
     """POST /tasks with project_type='new' and git_url stores the URL on the project."""
     payload = {
-        "project_type": "new",
+        "task_type": "scaffold_project",
         "project_name": "My Repo Project",
         "agent_id": str(seeded_agent.id),
         "git_url": "https://github.com/org/my-repo",
