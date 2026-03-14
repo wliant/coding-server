@@ -22,6 +22,7 @@ export interface TaskFormValues {
   branch?: string;
   requirements: string;
   commits_to_review?: number;
+  required_capabilities?: string[];
 }
 
 interface TaskFormProps {
@@ -70,6 +71,9 @@ export function TaskForm({
   const [commitsToReview, setCommitsToReview] = useState<string>(
     merged.commits_to_review != null ? String(merged.commits_to_review) : ""
   );
+  const [capabilitiesInput, setCapabilitiesInput] = useState<string>(
+    merged.required_capabilities?.join(", ") ?? ""
+  );
 
   const isScaffold = taskType === "scaffold_project";
   const isReview = taskType === "review_code";
@@ -99,6 +103,14 @@ export function TaskForm({
 
     if (isReview && commitsToReview.trim()) {
       data.commits_to_review = parseInt(commitsToReview, 10);
+    }
+
+    const caps = capabilitiesInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (caps.length > 0) {
+      data.required_capabilities = caps;
     }
 
     await onSubmit(data);
@@ -247,6 +259,26 @@ export function TaskForm({
           onChange={(e) => setRequirements(e.target.value)}
           rows={6}
         />
+      </div>
+
+      {/* Required Capabilities */}
+      <div className="space-y-2">
+        <label
+          htmlFor="capabilities-input"
+          className="block text-sm font-medium text-foreground"
+        >
+          Required Capabilities (optional)
+        </label>
+        <Input
+          id="capabilities-input"
+          aria-label="Required Capabilities"
+          placeholder="e.g. python, git, docker"
+          value={capabilitiesInput}
+          onChange={(e) => setCapabilitiesInput(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Comma-separated list of sandbox capabilities needed for this task
+        </p>
       </div>
 
       {/* Submit */}

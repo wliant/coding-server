@@ -114,6 +114,41 @@ test("GET /diff with no active task on worker returns 404 or 400", async ({
   expect([400, 404]).toContain(response.status());
 });
 
+test("GET /tasks/{id}/files returns 404 for unknown task", async ({
+  request,
+}) => {
+  const fakeId = "00000000-0000-0000-0000-000000000002";
+  const response = await request.get(`${API_URL}/tasks/${fakeId}/files`);
+  expect(response.status()).toBe(404);
+});
+
+test("GET /tasks/{id}/files/{path} returns 404 for unknown task", async ({
+  request,
+}) => {
+  const fakeId = "00000000-0000-0000-0000-000000000003";
+  const response = await request.get(`${API_URL}/tasks/${fakeId}/files/README.md`);
+  expect(response.status()).toBe(404);
+});
+
+test("GET /tasks/{id}/files returns 404 for pending task without git_url", async ({
+  request,
+}) => {
+  const agentId = await getAgentId(request);
+  const createResponse = await request.post(`${API_URL}/tasks`, {
+    data: {
+      task_type: "scaffold_project",
+      project_name: "No Git URL Project",
+      agent_id: agentId,
+      requirements: "E2E file proxy test",
+    },
+  });
+  expect(createResponse.status()).toBe(201);
+  const taskId: string = (await createResponse.json()).id;
+
+  const filesResponse = await request.get(`${API_URL}/tasks/${taskId}/files`);
+  expect(filesResponse.status()).toBe(404);
+});
+
 test("GET /tasks returns list including newly created task", async ({
   request,
 }) => {

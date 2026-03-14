@@ -55,6 +55,26 @@ interface FileTreeProps {
   entries: FileEntry[];
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  filter?: string;
+}
+
+/** Returns the set of entry paths that match the filter (and their ancestor dirs). */
+function getFilteredPaths(entries: FileEntry[], filter: string): Set<string> | null {
+  if (!filter.trim()) return null; // no filtering
+  const lowerFilter = filter.toLowerCase();
+  const matchingFiles = entries.filter(
+    (e) => e.type === "file" && e.path.toLowerCase().includes(lowerFilter),
+  );
+  const result = new Set<string>();
+  for (const f of matchingFiles) {
+    result.add(f.path);
+    // Add all ancestor directories
+    const parts = f.path.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      result.add(parts.slice(0, i).join("/"));
+    }
+  }
+  return result;
 }
 
 interface TreeNodeViewProps {
@@ -64,6 +84,7 @@ interface TreeNodeViewProps {
   onSelect: (path: string) => void;
   expandedDirs: Set<string>;
   toggleDir: (path: string) => void;
+  filteredPaths?: Set<string> | null;
 }
 
 function TreeNodeView({
@@ -73,6 +94,7 @@ function TreeNodeView({
   onSelect,
   expandedDirs,
   toggleDir,
+  filteredPaths,
 }: TreeNodeViewProps) {
   const paddingLeft = 8 + depth * 16;
   const isExpanded = expandedDirs.has(node.path);
@@ -92,17 +114,20 @@ function TreeNodeView({
           <span className="font-medium truncate">{node.name}</span>
         </button>
         {isExpanded &&
-          node.children.map((child) => (
-            <TreeNodeView
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              selectedPath={selectedPath}
-              onSelect={onSelect}
-              expandedDirs={expandedDirs}
-              toggleDir={toggleDir}
-            />
-          ))}
+          node.children
+            .filter((child) => !filteredPaths || filteredPaths.has(child.path))
+            .map((child) => (
+              <TreeNodeView
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                selectedPath={selectedPath}
+                onSelect={onSelect}
+                expandedDirs={expandedDirs}
+                toggleDir={toggleDir}
+                filteredPaths={filteredPaths}
+              />
+            ))}
       </div>
     );
   }
@@ -121,8 +146,9 @@ function TreeNodeView({
   );
 }
 
-export function FileTree({ entries, selectedPath, onSelect }: FileTreeProps) {
+export function FileTree({ entries, selectedPath, onSelect, filter }: FileTreeProps) {
   const tree = buildTree(entries);
+  const filteredPaths = getFilteredPaths(entries, filter ?? "");
 
   // Default: expand all top-level directories
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => {
@@ -132,6 +158,11 @@ export function FileTree({ entries, selectedPath, onSelect }: FileTreeProps) {
     }
     return topDirs;
   });
+
+  // When filter is active, auto-expand all matched dirs
+  const effectiveExpanded = filteredPaths
+    ? new Set([...expandedDirs, ...Array.from(filteredPaths).filter((p) => entries.some((e) => e.path === p && e.type === "directory"))])
+    : expandedDirs;
 
   function toggleDir(path: string) {
     setExpandedDirs((prev) => {
@@ -152,19 +183,32 @@ export function FileTree({ entries, selectedPath, onSelect }: FileTreeProps) {
     );
   }
 
+  if (filteredPaths && filteredPaths.size === 0) {
+    return (
+      <div className="p-4">
+        <p className="text-sm text-muted-foreground">
+          No files match the filter.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="py-1">
-      {tree.map((node) => (
-        <TreeNodeView
-          key={node.path}
-          node={node}
-          depth={0}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-          expandedDirs={expandedDirs}
-          toggleDir={toggleDir}
-        />
-      ))}
+      {tree
+        .filter((node) => !filteredPaths || filteredPaths.has(node.path))
+        .map((node) => (
+          <TreeNodeView
+            key={node.path}
+            node={node}
+            depth={0}
+            selectedPath={selectedPath}
+            onSelect={onSelect}
+            expandedDirs={effectiveExpanded}
+            toggleDir={toggleDir}
+            filteredPaths={filteredPaths}
+          />
+        ))}
     </div>
   );
 }

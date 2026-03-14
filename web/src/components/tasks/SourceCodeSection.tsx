@@ -20,11 +20,13 @@ import {
 interface SourceCodeSectionProps {
   taskId: string;
   workerUrl: string | null | undefined;
+  isNewProject?: boolean;
 }
 
 export function SourceCodeSection({
   taskId,
   workerUrl,
+  isNewProject = false,
 }: SourceCodeSectionProps) {
   const baseUrl = getWorkerBaseUrl(workerUrl);
 
@@ -136,19 +138,21 @@ export function SourceCodeSection({
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold text-sm">Source Code</h2>
-          <Tabs
-            value={viewMode}
-            onValueChange={(v) => setViewMode(v as "source" | "diff")}
-          >
-            <TabsList className="h-7">
-              <TabsTrigger value="source" className="text-xs px-3 h-6">
-                Source
-              </TabsTrigger>
-              <TabsTrigger value="diff" className="text-xs px-3 h-6">
-                Diff
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {!isNewProject && (
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "source" | "diff")}
+            >
+              <TabsList className="h-7">
+                <TabsTrigger value="source" className="text-xs px-3 h-6">
+                  Source
+                </TabsTrigger>
+                <TabsTrigger value="diff" className="text-xs px-3 h-6">
+                  Diff
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
         </div>
         <Button
           variant="outline"
@@ -198,7 +202,7 @@ export function SourceCodeSection({
       )}
 
       {/* Diff mode */}
-      {viewMode === "diff" && (
+      {viewMode === "diff" && !isNewProject && (
         <>
           {diffError && !diffLoading && (
             <div className="p-4">

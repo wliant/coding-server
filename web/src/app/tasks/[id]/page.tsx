@@ -4,9 +4,11 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/tasks/StatusBadge";
 import { PushToRemoteButton } from "@/components/tasks/PushToRemoteButton";
-import { SourceCodeSection } from "@/components/tasks/SourceCodeSection";
+import { FileNavigatorTab } from "@/components/tasks/FileNavigatorTab";
+import { DiffTab } from "@/components/tasks/DiffTab";
 import { initiateCleanupTasksTaskIdCleanupPost, getTaskDetail } from "@/client/sdk.gen";
 import { client } from "@/client/client.gen";
 import type { TaskDetailResponse } from "@/client/types.gen";
@@ -74,6 +76,10 @@ export default function TaskDetailPage() {
     });
   };
 
+  const isNewProject = task.task_type === "scaffold_project" || !task.project.git_url;
+  const showFilesTab = !!(task.assigned_worker_url || task.assigned_sandbox_url || task.project.git_url);
+  const showDiffTab = !isNewProject && (task.status === "completed" || task.status === "failed");
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
@@ -83,120 +89,172 @@ export default function TaskDetailPage() {
         <h1 className="text-2xl font-bold">Task Detail</h1>
       </div>
 
-      <div className="rounded-lg border p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground font-mono">{task.id}</span>
-          <div className="flex items-center gap-2">
-            <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
-              {TASK_TYPE_LABELS[task.task_type] ?? task.task_type}
-            </span>
-            <StatusBadge status={task.status} />
-          </div>
-        </div>
+      <Tabs defaultValue="details">
+        <TabsList>
+          <TabsTrigger value="details">Details</TabsTrigger>
+          {showFilesTab && <TabsTrigger value="files">Files</TabsTrigger>}
+          {showDiffTab && <TabsTrigger value="diff">Diff</TabsTrigger>}
+        </TabsList>
 
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">Requirements</p>
-          <p className="text-sm whitespace-pre-wrap">{task.requirements}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="font-medium text-muted-foreground mb-1">Project</p>
-            <p>{task.project.name ?? "New Project"}</p>
-          </div>
-          {task.project.git_url && (
-            <div>
-              <p className="font-medium text-muted-foreground mb-1">Git URL</p>
-              <p className="font-mono text-xs truncate">{task.project.git_url}</p>
+        <TabsContent value="details">
+          <div className="rounded-lg border p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground font-mono">{task.id}</span>
+              <div className="flex items-center gap-2">
+                <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
+                  {TASK_TYPE_LABELS[task.task_type] ?? task.task_type}
+                </span>
+                <StatusBadge status={task.status} />
+              </div>
             </div>
-          )}
-          <div>
-            <p className="font-medium text-muted-foreground mb-1">Submitted</p>
-            <p>{formatDate(task.created_at)}</p>
-          </div>
-          {task.started_at && (
-            <div>
-              <p className="font-medium text-muted-foreground mb-1">Started</p>
-              <p>{formatDate(task.started_at)}</p>
-            </div>
-          )}
-          {task.completed_at && (
-            <div>
-              <p className="font-medium text-muted-foreground mb-1">Completed</p>
-              <p>{formatDate(task.completed_at)}</p>
-            </div>
-          )}
-          {task.commits_to_review != null && (
-            <div>
-              <p className="font-medium text-muted-foreground mb-1">Commits to Review</p>
-              <p>{task.commits_to_review}</p>
-            </div>
-          )}
-          {task.work_directory_path && (
-            <div>
-              <p className="font-medium text-muted-foreground mb-1">Working Directory</p>
-              <p className="font-mono text-xs truncate">{task.work_directory_path}</p>
-            </div>
-          )}
-        </div>
 
-        {task.status === "in_progress" && task.elapsed_seconds != null && (
-          <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-sm text-purple-800">
-            ⏱ Running for {task.elapsed_seconds}s
-          </div>
-        )}
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">Requirements</p>
+              <p className="text-sm whitespace-pre-wrap">{task.requirements}</p>
+            </div>
 
-        {task.status === "failed" && task.error_message && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
-            <p className="font-medium mb-1">Error</p>
-            <p className="whitespace-pre-wrap font-mono text-xs">{task.error_message}</p>
-          </div>
-        )}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-medium text-muted-foreground mb-1">Project</p>
+                <p>{task.project.name ?? "New Project"}</p>
+              </div>
+              {task.project.git_url && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Git URL</p>
+                  <p className="font-mono text-xs truncate">{task.project.git_url}</p>
+                </div>
+              )}
+              <div>
+                <p className="font-medium text-muted-foreground mb-1">Submitted</p>
+                <p>{formatDate(task.created_at)}</p>
+              </div>
+              {task.started_at && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Started</p>
+                  <p>{formatDate(task.started_at)}</p>
+                </div>
+              )}
+              {task.completed_at && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Completed</p>
+                  <p>{formatDate(task.completed_at)}</p>
+                </div>
+              )}
+              {task.commits_to_review != null && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Commits to Review</p>
+                  <p>{task.commits_to_review}</p>
+                </div>
+              )}
+              {task.work_directory_path && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Working Directory</p>
+                  <p className="font-mono text-xs truncate">{task.work_directory_path}</p>
+                </div>
+              )}
+              {task.required_capabilities && task.required_capabilities.length > 0 && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Required Capabilities</p>
+                  <div className="flex gap-1 flex-wrap">
+                    {task.required_capabilities.map((cap) => (
+                      <span
+                        key={cap}
+                        className="inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800"
+                      >
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {task.assigned_sandbox_id && (
+                <div>
+                  <p className="font-medium text-muted-foreground mb-1">Sandbox</p>
+                  <p className="font-mono text-xs truncate">{task.assigned_sandbox_id}</p>
+                </div>
+              )}
+            </div>
 
-        {task.status === "completed" && (
-          <div className="pt-2 border-t">
-            <PushToRemoteButton taskId={task.id} projectGitUrl={task.project.git_url} />
-          </div>
-        )}
-
-        {(task.status === "completed" || task.status === "failed") && (
-          <div className="pt-2 border-t space-y-2">
-            {cleanupError && (
-              <p className="text-sm text-red-600">{cleanupError}</p>
+            {task.status === "in_progress" && task.elapsed_seconds != null && (
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-sm text-purple-800">
+                Running for {task.elapsed_seconds}s
+              </div>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isCleaningUp}
-              onClick={async () => {
-                setIsCleaningUp(true);
-                setCleanupError(null);
-                try {
-                  await initiateCleanupTasksTaskIdCleanupPost({ path: { task_id: taskId } });
-                  // Refresh task status
-                  const result = await getTaskDetail({ path: { task_id: taskId } });
-                  if (result.data) setTask(result.data);
-                } catch (err) {
-                  setCleanupError(
-                    err instanceof Error ? err.message : "Cleanup failed"
-                  );
-                } finally {
-                  setIsCleaningUp(false);
-                }
-              }}
-            >
-              {isCleaningUp ? "Cleaning up…" : "Clean Up"}
-            </Button>
-          </div>
-        )}
-      </div>
 
-      {(task.status === "completed" || task.status === "failed") && (
-        <SourceCodeSection
-          taskId={String(task.id)}
-          workerUrl={task.assigned_worker_url}
-        />
-      )}
+            {task.status === "failed" && task.error_message && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
+                <p className="font-medium mb-1">Error</p>
+                <p className="whitespace-pre-wrap font-mono text-xs">{task.error_message}</p>
+              </div>
+            )}
+
+            {task.status === "completed" && (
+              <div className="pt-2 border-t">
+                <PushToRemoteButton taskId={task.id} projectGitUrl={task.project.git_url} />
+              </div>
+            )}
+
+            {(task.status === "completed" || task.status === "failed") && (
+              <div className="pt-2 border-t space-y-2">
+                {cleanupError && (
+                  <p className="text-sm text-red-600">{cleanupError}</p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isCleaningUp}
+                  onClick={async () => {
+                    setIsCleaningUp(true);
+                    setCleanupError(null);
+                    try {
+                      await initiateCleanupTasksTaskIdCleanupPost({ path: { task_id: taskId } });
+                      const result = await getTaskDetail({ path: { task_id: taskId } });
+                      if (result.data) setTask(result.data);
+                    } catch (err) {
+                      setCleanupError(
+                        err instanceof Error ? err.message : "Cleanup failed"
+                      );
+                    } finally {
+                      setIsCleaningUp(false);
+                    }
+                  }}
+                >
+                  {isCleaningUp ? "Cleaning up..." : "Clean Up"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {showFilesTab && (
+          <TabsContent value="files">
+            <FileNavigatorTab
+              taskId={String(task.id)}
+              workerUrl={task.assigned_worker_url}
+              banner={
+                task.status === "pending" ? (
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
+                    Showing repository contents (read-only)
+                  </p>
+                ) : task.status === "in_progress" ? (
+                  <p className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded px-3 py-1.5">
+                    Files may change as the agent works
+                  </p>
+                ) : null
+              }
+            />
+          </TabsContent>
+        )}
+
+        {showDiffTab && (
+          <TabsContent value="diff">
+            <DiffTab
+              taskId={String(task.id)}
+              workerUrl={task.assigned_worker_url}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
