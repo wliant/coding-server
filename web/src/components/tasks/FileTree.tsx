@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { FileEntry } from "@/lib/workerClient";
+import type { FileEntry } from "@/lib/fileProxyClient";
 
 interface TreeNode {
   name: string;

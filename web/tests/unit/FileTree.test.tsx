@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { FileTree } from "../../src/components/tasks/FileTree";
-import type { FileEntry } from "../../src/lib/workerClient";
+import type { FileEntry } from "../../src/lib/fileProxyClient";
 
 const mockEntries: FileEntry[] = [
   { name: "src", path: "src", type: "directory" },
