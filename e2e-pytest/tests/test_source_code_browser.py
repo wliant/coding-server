@@ -85,8 +85,8 @@ def test_source_code_section_not_visible_for_pending_task(
     page.goto(f"{BASE_URL}/tasks/{task_id}")
     # Wait for task detail to load
     expect(page.get_by_text("Task Detail")).to_be_visible()
-    # Source Code section must NOT appear for pending tasks
-    expect(page.get_by_text("Source Code")).not_to_be_visible()
+    # Files tab must NOT appear for pending scaffold_project tasks (no git_url)
+    expect(page.get_by_role("tab", name="Files")).not_to_be_visible()
 
 
 def test_download_code_not_in_main_panel_for_pending_task(

@@ -20,6 +20,8 @@ services:
   api:
     ports:
       - "${API_PORT:-8100}:8000"
+    environment:
+      CORS_ORIGINS: "http://web:3000"
     env_file:
       - .env.e2e
 
@@ -33,11 +35,16 @@ services:
 
   sandbox:
     ports:
-      - "${SANDBOX_PORT:-8105}:8005"
+      - "${SANDBOX_PORT:-8105}:8006"
     env_file:
       - .env.e2e
 
   web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8000
     ports:
       - "${WEB_PORT:-3100}:3000"
     env_file:
@@ -75,7 +82,7 @@ services:
       API_URL: http://api:8000
       WORKER_URL: http://simple_crewai_pair_agent:8001
       TOOLS_URL: http://tools:8002
-      SANDBOX_URL: http://sandbox:8005
+      SANDBOX_URL: http://sandbox:8006
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/madm
       COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-madm_e2e}
     networks:
