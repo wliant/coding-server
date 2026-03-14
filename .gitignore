@@ -69,3 +69,6 @@ web/src/client/
 
 # Playwright MCP browser session logs
 .playwright-mcp/
+
+# Claude Code
+.claude/
